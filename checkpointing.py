@@ -19,9 +19,9 @@ class PeriodicCheckpoint(ModelCheckpoint):
         if pl_module.global_step % self.every == 0:
             assert self.dirpath is not None
             current = Path(self.dirpath) / f"latest-{pl_module.global_step}.ckpt"
-            prev = (
-                Path(self.dirpath) / f"latest-{pl_module.global_step - self.every}.ckpt"
-            )
-            print(current)
+            # prev = (
+            #     Path(self.dirpath) / f"latest-{pl_module.global_step - self.every}.ckpt"
+            # )
+            print('saving', current)
             trainer.save_checkpoint(current)
 

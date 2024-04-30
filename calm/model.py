@@ -13,7 +13,7 @@ from .modules import (
     TransformerLayer,
     LearnedPositionalEmbedding,
     RobertaLMHead,
-    ESM1bLayerNorm
+    ESM1bLayerNorm,
 )
 
 
@@ -24,10 +24,14 @@ class ProteinBertModel(nn.Module):
             "--num_layers", default=12, type=int, metavar="N", help="number of layers"
         )
         parser.add_argument(
-            "--embed_dim", default=768, type=int, metavar="N", help="embedding dimension"
+            "--embed_dim",
+            default=768,
+            type=int,
+            metavar="N",
+            help="embedding dimension",
         )
         parser.add_argument(
-            "--attention_dropout", default=0., type=float, help="dropout on attention"
+            "--attention_dropout", default=0.0, type=float, help="dropout on attention"
         )
         parser.add_argument(
             "--logit_bias", action="store_true", help="whether to apply bias to logits"
@@ -36,11 +40,11 @@ class ProteinBertModel(nn.Module):
             "--rope_embedding",
             default=True,
             type=bool,
-            help="whether to use Rotary Positional Embeddings"
+            help="whether to use Rotary Positional Embeddings",
         )
         parser.add_argument(
             "--ffn_embed_dim",
-            default=768*4,
+            default=768 * 4,
             type=int,
             metavar="N",
             help="embedding dimension for FFN",
@@ -115,7 +119,9 @@ class ProteinBertModel(nn.Module):
             # x: B x T x C
             mask_ratio_train = 0.15 * 0.8
             src_lengths = (~padding_mask).sum(-1)
-            mask_ratio_observed = (tokens == self.mask_idx).sum(-1).float() / src_lengths
+            mask_ratio_observed = (tokens == self.mask_idx).sum(
+                -1
+            ).float() / src_lengths
             x = x * (1 - mask_ratio_train) / (1 - mask_ratio_observed)[:, None, None]
 
         if not self.args.rope_embedding:
@@ -142,7 +148,9 @@ class ProteinBertModel(nn.Module):
 
         for layer_idx, layer in enumerate(self.layers):
             x, attn = layer(
-                x, self_attn_padding_mask=padding_mask, need_head_weights=need_head_weights
+                x,
+                self_attn_padding_mask=padding_mask,
+                need_head_weights=need_head_weights,
             )
             if (layer_idx + 1) in repr_layers:
                 hidden_representations[layer_idx + 1] = x.transpose(0, 1)
@@ -167,7 +175,9 @@ class ProteinBertModel(nn.Module):
                 attentions = attentions[..., :-1]
             if padding_mask is not None:
                 attention_mask = 1 - padding_mask.type_as(attentions)
-                attention_mask = attention_mask.unsqueeze(1) * attention_mask.unsqueeze(2)
+                attention_mask = attention_mask.unsqueeze(1) * attention_mask.unsqueeze(
+                    2
+                )
                 attentions = attentions * attention_mask[:, None, None, :, :]
             result["attentions"] = attentions
 

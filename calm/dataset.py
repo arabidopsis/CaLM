@@ -1,7 +1,5 @@
 """Common class for sequence datasets."""
 
-from typing import Tuple
-
 import torch
 from Bio import SeqIO
 
@@ -15,12 +13,12 @@ from .sequence import (
 class SequenceDataset(torch.utils.data.Dataset):
     """Common class for sequence datasets."""
 
-    def __init__(self, fasta_file: str, codon_sequence: bool=True):
+    def __init__(self, fasta_file: str, codon_sequence: bool = True):
         self.fasta_file = fasta_file
         self.codon_sequence = codon_sequence
         self._sequences, self._titles = [], []
 
-        for record in SeqIO.parse(fasta_file, 'fasta'):
+        for record in SeqIO.parse(fasta_file, "fasta"):
             self._titles.append(record.id)
             if self.codon_sequence:
                 self._sequences.append(CodonSequence(record.seq))
