@@ -4,7 +4,7 @@ This code has been modified from the original implementation
 by Facebook Research, describing its ESM-1b paper."""
 
 import math
-
+from dataclasses import dataclass
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -16,6 +16,17 @@ from .modules import (
     ESM1bLayerNorm,
 )
 
+from .alphabet import Alphabet
+
+@dataclass 
+class ProteinBertModelCfg:
+    num_layers: int = 12
+    embed_dim: int = 768
+    attention_dropout: float = 0.0
+    logit_bias: bool = False
+    rope_embedding: bool = True
+    ffn_embed_dim: int = 768 * 4
+    attention_heads: int = 12
 
 class ProteinBertModel(nn.Module):
     @classmethod
@@ -57,7 +68,7 @@ class ProteinBertModel(nn.Module):
             help="number of attention heads",
         )
 
-    def __init__(self, args, alphabet):
+    def __init__(self, args: ProteinBertModelCfg, alphabet:Alphabet):
         super().__init__()
         self.args = args
         self.alphabet_size = len(alphabet)
