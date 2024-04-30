@@ -7,7 +7,7 @@ import torch
 import numpy as np
 from torch import nn
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger
+from pytorch_lightning.loggers import WandbLogger, CSVLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
 
 from data_module import CodonDataModule
@@ -83,7 +83,7 @@ class CodonModel(pl.LightningModule):
         )
 
         if batch_idx % self.args.accumulate_gradients == 0:
-            self.log('train_loss', loss)
+            self.log('train_loss', loss, batch_size=self.args.batch_size)
         return loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -97,7 +97,7 @@ class CodonModel(pl.LightningModule):
             likelihoods.view(-1, len(self.alphabet.all_toks)),
             labels.view(-1)
         )
-        self.log('val_loss', loss)
+        self.log('val_loss', loss, batch_size=self.args.batch_size)
         return loss
 
 
@@ -116,6 +116,7 @@ if __name__ == '__main__':
     parser.add_argument('--lr_scheduler', type=str, default='warmup_cosine')
     parser.add_argument('--learning_rate', type=float, default=4e-4)
     parser.add_argument('--num_steps', type=int, default=121000)
+    parser.add_argument('--ckpt_path', type=str, default=None)
     ProteinBertModel.add_args(parser)
     args = parser.parse_args()
 
@@ -128,14 +129,15 @@ if __name__ == '__main__':
     model = CodonModel(args, alphabet)
 
     # training
-    name = 'production-run'
-    logger = WandbLogger(name=name, project='12layers', version='restart3')
-    trainer = pl.Trainer(gpus=4, num_nodes=1, precision=16,
+    name = 'training-run'
+    # logger = WandbLogger(name=name, project='12layers', version='restart3')
+    logger = CSVLogger("logs", name=name)
+    trainer = pl.Trainer(num_nodes=1, precision='bf16-mixed',
         max_steps=args.num_steps, logger=logger, log_every_n_steps=1,
-        val_check_interval=100*args.accumulate_gradients,
-        accumulate_grad_batches=args.accumulate_gradients,
-        limit_val_batches=0.25, accelerator='dp',
+        # val_check_interval=100*args.accumulate_gradients,
+        # accumulate_grad_batches=args.accumulate_gradients,
+        limit_val_batches=1.0, accelerator='auto',
         callbacks=[PeriodicCheckpoint(1000, name),
             LearningRateMonitor(logging_interval='step')])
     trainer.fit(model, datamodule=datamodule,
-        ckpt_path='production-run/latest-56000.ckpt')
+        ckpt_path=args.ckpt_path)

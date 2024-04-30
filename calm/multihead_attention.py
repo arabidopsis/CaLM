@@ -477,7 +477,7 @@ class MultiheadAttention(nn.Module):
         buffer: Dict[str, Optional[Tensor]],
     ):
         return self.set_incremental_state(incremental_state, "attn_state", buffer)
-
+    @staticmethod
     def apply_sparse_mask(attn_weights, tgt_len: int, src_len: int, bsz: int):
         return attn_weights
 

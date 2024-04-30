@@ -15,8 +15,8 @@ from calm.pipeline import (
     DataTrimmer,
     DataPadder,
     DataPreprocessor,
-    CodonRandomizer,
-    DataPreprocessorForDualData,
+    # CodonRandomizer,
+    # DataPreprocessorForDualData,
 )
 
 
@@ -51,5 +51,5 @@ class CodonDataModule(pl.LightningDataModule):
             batch_size=self.batch_size, collate_fn=self.pipeline)
 
     def val_dataloader(self):
-        return torch.utils.data.DataLoader(self.val_data, num_workers=1,
+        return torch.utils.data.DataLoader(self.val_data, num_workers=3,
             batch_size=self.batch_size, collate_fn=self.pipeline)

@@ -8,7 +8,7 @@ from Bio import SeqIO
 from .sequence import (
     Sequence,
     CodonSequence,
-    AminoAcidSequence
+    # AminoAcidSequence
 )
 
 
