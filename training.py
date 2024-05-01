@@ -2,29 +2,43 @@
 
 import math
 import argparse
-
+from pathlib import Path
+from dataclasses import dataclass, field
 import torch
 import numpy as np
 from torch import nn
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import WandbLogger, CSVLogger
+from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
 
 from data_module import CodonDataModule
 from checkpointing import PeriodicCheckpoint
-from calm.sequence import CodonSequence
 from calm.alphabet import Alphabet
-from calm.model import ProteinBertModel
+from calm.model import ProteinBertModel, ProteinBertModelCfg
+from calm.utils import ArgparseMixin, optional
+
+
+@dataclass
+class CodonModelCfg(ArgparseMixin):
+    batch_size: int = 46
+    warmup_steps: int = 1000
+    weight_decay: float = 0.1
+    lr_scheduler: str = "warmup_cosine"
+    learning_rate: float = 4e-4
+    accumulate_gradients: int = 40
+    num_steps: int = 121000
 
 
 class CodonModel(pl.LightningModule):
     """PyTorch Lightning module for standard training."""
 
-    def __init__(self, args, alphabet):
+    def __init__(
+        self, cfg: CodonModelCfg, model_cfg: ProteinBertModelCfg, alphabet: Alphabet
+    ):
         super().__init__()
-        self.args = args
+        self.args = cfg
         self.alphabet = alphabet
-        self.model = ProteinBertModel(args, alphabet)
+        self.model = ProteinBertModel(model_cfg, alphabet)
 
         def init_weights(module):
             if isinstance(module, (torch.nn.Linear, torch.nn.Embedding)):
@@ -109,32 +123,39 @@ class CodonModel(pl.LightningModule):
         return loss
 
 
-if __name__ == "__main__":
+@dataclass
+class TrainingCfg(ArgparseMixin):
+    ckpt_path: str | None = field(default=None, metadata=dict(type=optional(str)))
+    data: str = "training_data.fasta"
+    no_progress_bar: bool = field(default=False, metadata=dict(action="store_true"))
 
+
+def train():
     # parsing
     parser = argparse.ArgumentParser()
-    parser.add_argument("--max_positions", type=int, default=1024)
-    parser.add_argument("--batch_size", type=int, default=46)
-    parser.add_argument("--accumulate_gradients", type=int, default=40)
-    parser.add_argument("--mask_proportion", type=float, default=0.25)
-    parser.add_argument("--leave_percent", type=float, default=0.1)
-    parser.add_argument("--mask_percent", type=float, default=0.8)
-    parser.add_argument("--warmup_steps", type=int, default=1000)
-    parser.add_argument("--weight_decay", type=float, default=0.1)
-    parser.add_argument("--lr_scheduler", type=str, default="warmup_cosine")
-    parser.add_argument("--learning_rate", type=float, default=4e-4)
-    parser.add_argument("--num_steps", type=int, default=121000)
-    parser.add_argument("--ckpt_path", type=str, default=None)
-    parser.add_argument("--data", type=str, default="training_data.fasta")
-    ProteinBertModel.add_args(parser)
+
+    parser = ProteinBertModel.add_args(parser)
+    parser = CodonDataModule.add_args(parser)
+    parser = CodonModelCfg.add_args(parser)
+    parser = TrainingCfg.add_args(parser)
     args = parser.parse_args()
+
+    training_cfg = TrainingCfg.create(args)
+    codon_cfg = CodonModelCfg.create(args)
+    model_cfg = ProteinBertModelCfg.create(args)
+    dm_cfg = CodonDataModule.create(args)
 
     # data
     alphabet = Alphabet.from_architecture("CodonModel")
-    datamodule = CodonDataModule(args, alphabet, args.data, args.batch_size)
+    datamodule = CodonDataModule(
+        dm_cfg,
+        alphabet,
+        str(Path(training_cfg.data).expanduser()),
+        codon_cfg.batch_size,
+    )
 
     # model
-    model = CodonModel(args, alphabet)
+    model = CodonModel(codon_cfg, model_cfg, alphabet)
 
     # training
     name = "training-run"
@@ -143,16 +164,26 @@ if __name__ == "__main__":
     trainer = pl.Trainer(
         num_nodes=1,
         precision="bf16-mixed",
-        max_steps=args.num_steps,
+        max_steps=codon_cfg.num_steps,
         logger=logger,
         log_every_n_steps=1,
         # val_check_interval=100*args.accumulate_gradients,
         # accumulate_grad_batches=args.accumulate_gradients,
-        limit_val_batches=1.0,
+        limit_val_batches=0.25,
         accelerator="auto",
+        enable_progress_bar=not training_cfg.no_progress_bar,
         callbacks=[
             PeriodicCheckpoint(1000, name),
             LearningRateMonitor(logging_interval="step"),
         ],
     )
-    trainer.fit(model, datamodule=datamodule, ckpt_path=args.ckpt_path)
+    ckpt_path = (
+        None
+        if training_cfg.ckpt_path is None
+        else str(Path(training_cfg.ckpt_path).expanduser())
+    )
+    trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
+
+
+if __name__ == "__main__":
+    train()

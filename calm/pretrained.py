@@ -3,40 +3,34 @@
 import os
 import pickle
 import requests
-from typing import Optional, Union, List
-
+from argparse import Namespace
 import torch
 from .alphabet import Alphabet
 from .sequence import CodonSequence
 from .model import ProteinBertModel
 
 
-class ArgDict:
-    def __init__(self, d):
-        self.__dict__ = d
-
-
-_ARGS = {
-    "max_positions": 1024,
-    "batch_size": 46,
-    "accumulate_gradients": 40,
-    "mask_proportion": 0.25,
-    "leave_percent": 0.10,
-    "mask_percent": 0.80,
-    "warmup_steps": 1000,
-    "weight_decay": 0.1,
-    "lr_scheduler": "warmup_cosine",
-    "learning_rate": 4e-4,
-    "num_steps": 121000,
-    "num_layers": 12,
-    "embed_dim": 768,
-    "attention_dropout": 0.0,
-    "logit_bias": False,
-    "rope_embedding": True,
-    "ffn_embed_dim": 768 * 4,
-    "attention_heads": 12,
-}
-ARGS = ArgDict(_ARGS)
+ARGS = Namespace(
+    max_positions=1024,
+    batch_size=46,
+    accumulate_gradients=40,
+    mask_proportion=0.25,
+    leave_percent=0.10,
+    mask_percent=0.80,
+    warmup_steps=1000,
+    weight_decay=0.1,
+    lr_scheduler="warmup_cosine",
+    learning_rate=4e-4,
+    num_steps=121000,
+    num_layers=12,
+    embed_dim=768,
+    attention_dropout=0.0,
+    logit_bias=False,
+    rope_embedding=True,
+    ffn_embed_dim=768 * 4,
+    attention_heads=12,
+    emb_layer_norm_before=False,
+)
 
 
 class CaLM:
@@ -45,7 +39,8 @@ class CaLM:
     embeddings provide strong signals for protein engineering",
     bioRxiv (2022), doi: 10.1101/2022.12.15.519894."""
 
-    def __init__(self, args: dict = ARGS, weights_file: Optional[str] = None) -> None:
+    def __init__(self, args: Namespace = ARGS, weights_file: str | None = None) -> None:
+        model_cfg = ProteinBertModel.create(args)
         if weights_file is None:
             model_folder = os.path.join(os.path.dirname(__file__), "calm_weights")
             weights_file = os.path.join(model_folder, "calm_weights.ckpt")
@@ -57,7 +52,7 @@ class CaLM:
                     handle.write(requests.get(url, timeout=300).content)
 
         self.alphabet = Alphabet.from_architecture("CodonModel")
-        self.model = ProteinBertModel(args, self.alphabet)
+        self.model = ProteinBertModel(model_cfg, self.alphabet)
         self.bc = self.alphabet.get_batch_converter()
 
         with open(weights_file, "rb") as handle:
@@ -68,7 +63,7 @@ class CaLM:
         return self.model(x)
 
     def embed_sequence(
-        self, sequence: Union[str, CodonSequence], average: bool = True
+        self, sequence: str | CodonSequence, average: bool = True
     ) -> torch.Tensor:
         """Embeds an individual sequence using CaLM. If the ``average''
         flag is True, then the representation is averaged over all
@@ -88,9 +83,7 @@ class CaLM:
         else:
             return repr_
 
-    def embed_sequences(
-        self, sequences: List[Union[str, CodonSequence]]
-    ) -> torch.Tensor:
+    def embed_sequences(self, sequences: list[str | CodonSequence]) -> torch.Tensor:
         """Embeds a set of sequences using CaLM."""
         return torch.cat(
             [self.embed_sequence(seq, average=True) for seq in sequences], dim=0

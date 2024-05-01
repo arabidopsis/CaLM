@@ -3,8 +3,9 @@
 This code has been modified from the original implementation
 by Facebook Research, describing its ESM-1b paper."""
 
+from argparse import ArgumentParser, Namespace
 import math
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -17,58 +18,50 @@ from .modules import (
 )
 
 from .alphabet import Alphabet
+from .utils import ArgparseMixin
 
-@dataclass 
-class ProteinBertModelCfg:
-    num_layers: int = 12
-    embed_dim: int = 768
-    attention_dropout: float = 0.0
-    logit_bias: bool = False
-    rope_embedding: bool = True
-    ffn_embed_dim: int = 768 * 4
-    attention_heads: int = 12
+
+@dataclass
+class ProteinBertModelCfg(ArgparseMixin):
+    num_layers: int = field(
+        default=12, metadata=dict(help="number of layers")
+    )
+    embed_dim: int = field(
+        default=768, metadata=dict(help="embedding dimension")
+    )
+    attention_dropout: float = field(
+        default=0.0, metadata=dict(help="dropout on attention")
+    )
+    logit_bias: bool = field(
+        default=False,
+        metadata=dict(help="whether to apply bias to logits"),
+    )
+    rope_embedding: bool = field(
+        default=True,
+        metadata=dict(help="whether to use Rotary Positional Embeddings"),
+    )
+    ffn_embed_dim: int = field(
+        default=768 * 4,
+        metadata=dict(help="embedding dimension for FFN"),
+    )
+    attention_heads: int = field(
+        default=12,
+        metadata=dict(help="number of attention heads"),
+    )
+    emb_layer_norm_before: bool = False
+
 
 class ProteinBertModel(nn.Module):
-    @classmethod
-    def add_args(cls, parser):
-        parser.add_argument(
-            "--num_layers", default=12, type=int, metavar="N", help="number of layers"
-        )
-        parser.add_argument(
-            "--embed_dim",
-            default=768,
-            type=int,
-            metavar="N",
-            help="embedding dimension",
-        )
-        parser.add_argument(
-            "--attention_dropout", default=0.0, type=float, help="dropout on attention"
-        )
-        parser.add_argument(
-            "--logit_bias", action="store_true", help="whether to apply bias to logits"
-        )
-        parser.add_argument(
-            "--rope_embedding",
-            default=True,
-            type=bool,
-            help="whether to use Rotary Positional Embeddings",
-        )
-        parser.add_argument(
-            "--ffn_embed_dim",
-            default=768 * 4,
-            type=int,
-            metavar="N",
-            help="embedding dimension for FFN",
-        )
-        parser.add_argument(
-            "--attention_heads",
-            default=12,
-            type=int,
-            metavar="N",
-            help="number of attention heads",
-        )
 
-    def __init__(self, args: ProteinBertModelCfg, alphabet:Alphabet):
+    @classmethod
+    def add_args(cls, parser: ArgumentParser) -> ArgumentParser:
+        return ProteinBertModelCfg.add_args(parser)
+
+    @classmethod
+    def create(cls, args: Namespace) -> ProteinBertModelCfg:
+        return ProteinBertModelCfg.create(args)
+
+    def __init__(self, args: ProteinBertModelCfg, alphabet: Alphabet):
         super().__init__()
         self.args = args
         self.alphabet_size = len(alphabet)
@@ -78,7 +71,7 @@ class ProteinBertModel(nn.Module):
         self.eos_idx = alphabet.eos_idx
         self.prepend_bos = alphabet.prepend_bos
         self.append_eos = alphabet.append_eos
-        self.emb_layer_norm_before = getattr(self.args, "emb_layer_norm_before", False)
+        self.emb_layer_norm_before = self.args.emb_layer_norm_before
         self.model_version = "ESM-1b"
         self._init_submodules_esm1b()
 

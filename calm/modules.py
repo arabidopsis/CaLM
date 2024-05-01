@@ -123,14 +123,14 @@ class LearnedPositionalEmbedding(nn.Embedding):
         super().__init__(num_embeddings_, embedding_dim, padding_idx)
         self.max_positions = num_embeddings
 
-    def forward(self, input: torch.Tensor):
+    def forward(self, input_: torch.Tensor):
         """Input is expected to be of size [bsz x seqlen]."""
-        if input.size(1) > self.max_positions:
+        if input_.size(1) > self.max_positions:
             raise ValueError(
-                f"Sequence length {input.size(1)} above maximum "
+                f"Sequence length {input_.size(1)} above maximum "
                 f" sequence length of {self.max_positions}"
             )
-        mask = input.ne(self.padding_idx).int()
+        mask = input_.ne(self.padding_idx).int()
         positions = (
             torch.cumsum(mask, dim=1).type_as(mask) * mask
         ).long() + self.padding_idx
@@ -207,7 +207,7 @@ except ImportError:
 
 
 class SinusoidalPositionalEmbedding(nn.Module):
-    def __init__(self, embed_dim, padding_idx, learned=False):
+    def __init__(self, embed_dim:int, padding_idx:int, learned:bool=False):
         super().__init__()
         self.embed_dim = embed_dim
         self.padding_idx = padding_idx
