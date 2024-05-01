@@ -9,8 +9,8 @@ def calm():
 @calm.command()
 @click.option("-t", "--torch", "is_torch", is_flag=True)
 @click.argument("weights_file", type=click.Path(dir_okay=False))
-@click.argument("fasta", type=click.Path(dir_okay=False))
-def to_tensor(weights_file: str, fasta: str, is_torch: bool) -> None:
+@click.argument("fasta_file", type=click.Path(dir_okay=False))
+def to_tensor(weights_file: str, fasta_file: str, is_torch: bool) -> None:
     """Convert cDNA fasta sequences into CaLM Tensors"""
     from Bio import SeqIO
     from .pretrained import TrainedModel, BareModel
@@ -20,7 +20,7 @@ def to_tensor(weights_file: str, fasta: str, is_torch: bool) -> None:
         c = BareModel(weights_file)
     else:
         c = TrainedModel(weights_file)
-    with open(fasta, "rt", encoding="ascii") as fp:
+    with open(fasta_file, "rt", encoding="ascii") as fp:
         for rec in SeqIO.parse(fp, "fasta"):
             r = c.to_tensor(rec.seq)
             t = r.mean(axis=1) # type: ignore

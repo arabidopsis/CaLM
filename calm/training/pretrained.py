@@ -1,6 +1,6 @@
 import torch
 
-from calm.sequence import CodonSequence
+from calm.sequence import CodonSequence, Sequence
 from calm.model import ProteinBertModel
 from .training import CodonModel
 
@@ -13,14 +13,15 @@ class TrainedModel:
         self.hyper_parameters = data["hyper_parameters"]
         model = self.Model(**self.hyper_parameters)
         model.load_state_dict(data["state_dict"])
-        self.model = self.get_inner_model(model)
-        self.bc = self.model.alphabet.get_batch_converter()
+        self.model: ProteinBertModel = self.get_inner_model(model)
+        self.model.eval()
+        self.batch_converter = self.model.alphabet.get_batch_converter()
 
-    def get_inner_model(self, model):
+    def get_inner_model(self, model: torch.nn.Module) -> ProteinBertModel:
         return model.model
 
-    def tokenize(self, seq: CodonSequence) -> torch.Tensor:
-        _, _, tokens = self.bc([("", seq.seq)])
+    def tokenize(self, seq: Sequence) -> torch.Tensor:
+        _, _, tokens = self.batch_converter([("", seq.seq)])
         return tokens
 
     def to_tensor(self, seq: str) -> torch.Tensor:
@@ -36,5 +37,5 @@ class TrainedModel:
 class BareModel(TrainedModel):
     Model = ProteinBertModel
 
-    def get_inner_model(self, model):
-        return model
+    def get_inner_model(self, model: torch.nn.Module) -> ProteinBertModel:
+        return model  # type: ignore

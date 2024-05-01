@@ -76,7 +76,7 @@ class ProteinBertModel(nn.Module):
         self.append_eos = alphabet.append_eos
 
         self.model_version = "ESM-1b"
-        self.emb_layer_norm_before : nn.Module | None = None
+        self.emb_layer_norm_before: nn.Module | None = None
         self._init_submodules_esm1b()
 
     def _init_submodules_common(self):
@@ -117,7 +117,15 @@ class ProteinBertModel(nn.Module):
             weight=self.embed_tokens.weight,
         )
 
-    def forward(self, tokens, repr_layers=[], need_head_weights=False):
+    def forward(
+        self,
+        tokens: torch.Tensor,
+        repr_layers: list[int] | set[int] | None = None,
+        need_head_weights: bool = False,
+    ):
+        padding_mask: torch.Tensor | None
+        if repr_layers is None:
+            repr_layers = []
 
         assert tokens.ndim == 2
         padding_mask = tokens.eq(self.padding_idx)  # B, T
@@ -141,7 +149,6 @@ class ProteinBertModel(nn.Module):
             x = self.emb_layer_norm_before(x)
         if padding_mask is not None:
             x = x * (1 - padding_mask.unsqueeze(-1).type_as(x))
-
         repr_layers = set(repr_layers)
         hidden_representations = {}
         if 0 in repr_layers:
@@ -155,14 +162,14 @@ class ProteinBertModel(nn.Module):
 
         if not padding_mask.any():
             padding_mask = None
-
+        layer_idx = 0
         for layer_idx, layer in enumerate(self.layers):
             x, attn = layer(
                 x,
                 self_attn_padding_mask=padding_mask,
                 need_head_weights=need_head_weights,
             )
-            if (layer_idx + 1) in repr_layers:
+            if layer_idx + 1 in repr_layers:
                 hidden_representations[layer_idx + 1] = x.transpose(0, 1)
             if need_head_weights:
                 # (H, B, T, T) => (B, H, T, T)
@@ -172,7 +179,7 @@ class ProteinBertModel(nn.Module):
         x = x.transpose(0, 1)  # (T, B, E) => (B, T, E)
 
         # last hidden representation should have layer norm applied
-        if (layer_idx + 1) in repr_layers:
+        if layer_idx + 1 in repr_layers:
             hidden_representations[layer_idx + 1] = x
         x = self.lm_head(x)
 

@@ -39,7 +39,7 @@ def _split_array(array: np.ndarray, chunks: list[int]) -> list[np.ndarray]:
 
 
 class PipelineInput(NamedTuple):
-    sequence: list[Sequence]
+    sequences: list[Sequence]
 
 
 class _PipelineData(NamedTuple):
@@ -137,7 +137,7 @@ class Pipeline:
         """
 
         data: PipelineInput | PipelineData | PipelineOutput = PipelineInput(
-            sequence=data_
+            sequences=data_
         )
         for transform in self.pipeline:
             data = transform(data)  # type: ignore
@@ -160,11 +160,11 @@ class DataCollator(PipelineEntrypoint):
     def __call__(self, input_: PipelineInput) -> PipelineData:
         output = PipelineData(ground_truth=[], sequence=[], target_mask=[])
 
-        for seq in input_.sequence:
+        for seq in input_.sequences:
             tokens, mask = self._mask_seq(seq.tokens)
             output.target_mask.append(mask)
             output.sequence.append(" ".join(tokens))
-            output.ground_truth.append(" ".join(seq.tokens))
+            output.ground_truth.append(seq.seq)
 
         return output
 

@@ -4,7 +4,7 @@ This code has been modified from the original implementation
 by Facebook Research, describing its ESM-1b paper."""
 
 import itertools
-from typing import Sequence, Tuple, List
+from typing import Sequence
 
 import torch
 
@@ -190,7 +190,7 @@ class Alphabet:
             use_codons,
         )
 
-    def _tokenize(self, text) -> str:
+    def _tokenize(self, text:str) -> list[str]:
         return text.split()
 
     def tokenize(self, text:str, **kwargs) -> list[str]:
@@ -265,7 +265,7 @@ class Alphabet:
         tokenized_text = split_on_tokens(no_split_token, text)
         return tokenized_text
 
-    def encode(self, text):
+    def encode(self, text:str) -> list[int]:
         return [self.tok_to_idx[tok] for tok in self.tokenize(text)]
 
 

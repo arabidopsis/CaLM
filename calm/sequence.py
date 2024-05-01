@@ -26,7 +26,6 @@ class Sequence(abc.ABC):
 
     def _sanitize(self, tokens: list[str]):
         return [x.strip() for x in tokens if x.strip() != ""]
-    
     @property
     def seq(self) -> str:
         return " ".join(self._tokens)
@@ -49,7 +48,7 @@ class CodonSequence(Sequence):
 
     def __init__(self, seq_: str | Seq):
         super().__init__()
-        seq = str(seq_)
+        seq = str(seq_).upper()
         _tokens = [
             "<cls>",
             *_split_into_codons(seq.replace("T", "U").replace(" ", "")),
@@ -62,7 +61,7 @@ class CodonSequence(Sequence):
 class AminoAcidSequence(Sequence):
     def __init__(self, seq_: str | Seq):
         super().__init__()
-        seq = str(seq_)
+        seq = str(seq_).upper()
         _tokens = [
             "<cls>",
             *seq.replace(" ", "").split(),
