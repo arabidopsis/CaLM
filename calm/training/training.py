@@ -11,8 +11,8 @@ import pytorch_lightning as pl
 from pytorch_lightning.loggers import CSVLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
 
-from data_module import CodonDataModule
-from checkpointing import PeriodicCheckpoint
+from .data_module import CodonDataModule
+from .checkpointing import PeriodicCheckpoint
 
 from calm.model import ProteinBertModel
 from calm.utils import ArgparseMixin, optional
