@@ -1,5 +1,5 @@
-import click
 from typing import IO
+import click
 
 @click.group()
 def calm():

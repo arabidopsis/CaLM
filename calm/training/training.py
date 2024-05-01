@@ -14,9 +14,9 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 from .data_module import CodonDataModule
 from .checkpointing import PeriodicCheckpoint
 
-from calm.model import ProteinBertModel
-from calm.utils import ArgparseMixin, optional
-from calm.alphabet import Alphabet
+from ..model import ProteinBertModel
+from ..utils import ArgparseMixin, optional
+from ..alphabet import Alphabet
 
 
 @dataclass
@@ -139,8 +139,8 @@ class TrainingCfg(ArgparseMixin):
 
 
 def train():
-    # parsing
-    parser = argparse.ArgumentParser()
+    # parsingbc
+    parser = argparse.ArgumentParser(prog='python -m calm.training')
 
     parser = ProteinBertModel.add_args(parser)
     parser = CodonDataModule.add_args(parser)
@@ -150,7 +150,7 @@ def train():
     args = parser.parse_args()
 
     training_cfg = TrainingCfg.create(args)
-    dm_cfg = CodonDataModule.create(args)
+    dm_cfg = CodonDataModule.create_cfg(args)
 
     # model
     # arguments and their types will be save to the ckpt files
@@ -168,6 +168,12 @@ def train():
         batch_size=codon_cfg.batch_size,
     )
 
+    ckpt_path = (
+        None
+        if training_cfg.ckpt_path is None
+        else str(Path(training_cfg.ckpt_path).expanduser())
+    )
+
     # training
     name = training_cfg.name
     # logger = WandbLogger(name=name, project='12layers', version='restart3')
@@ -178,8 +184,8 @@ def train():
         max_steps=codon_cfg.num_steps,
         logger=logger,
         log_every_n_steps=1,
-        # val_check_interval=100*args.accumulate_gradients,
-        # accumulate_grad_batches=args.accumulate_gradients,
+        # val_check_interval=100*codon_cfg.accumulate_gradients,
+        # accumulate_grad_batches=codon_cfg.accumulate_gradients,
         limit_val_batches=1.0,
         accelerator="auto",
         enable_progress_bar=not training_cfg.no_progress_bar,
@@ -188,11 +194,7 @@ def train():
             LearningRateMonitor(logging_interval="step"),
         ],
     )
-    ckpt_path = (
-        None
-        if training_cfg.ckpt_path is None
-        else str(Path(training_cfg.ckpt_path).expanduser())
-    )
+
     trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
 
 

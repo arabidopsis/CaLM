@@ -48,6 +48,10 @@ class ProteinBertModelCfg(ArgparseMixin):
 
 
 class ProteinBertModel(nn.Module):
+    layers: nn.Module
+    embed_tokens: nn.Module
+    emb_layer_norm_after: nn.Module
+    lm_head: nn.Module
 
     @classmethod
     def add_args(cls, parser: ArgumentParser) -> ArgumentParser:
@@ -68,20 +72,18 @@ class ProteinBertModel(nn.Module):
         self.alphabet = alphabet = Alphabet.from_architecture(self.cfg.alphabet)
         self.alphabet_size = len(alphabet)
 
-        self.padding_idx = alphabet.padding_idx
-        self.mask_idx = alphabet.mask_idx
-        self.cls_idx = alphabet.cls_idx
-        self.eos_idx = alphabet.eos_idx
-        self.prepend_bos = alphabet.prepend_bos
-        self.append_eos = alphabet.append_eos
-
         self.model_version = "ESM-1b"
+        self.embed_scale = 1
         self.emb_layer_norm_before: nn.Module | None = None
+        self.embed_positions: nn.Module | None = None
+
         self._init_submodules_esm1b()
 
     def _init_submodules_common(self):
         self.embed_tokens = nn.Embedding(
-            self.alphabet_size, self.cfg.embed_dim, padding_idx=self.padding_idx
+            self.alphabet_size,
+            self.cfg.embed_dim,
+            padding_idx=self.alphabet.padding_idx,
         )
         self.layers = nn.ModuleList(
             [
@@ -100,16 +102,13 @@ class ProteinBertModel(nn.Module):
 
     def _init_submodules_esm1b(self):
         self._init_submodules_common()
-        self.embed_scale = 1
         if not self.cfg.rope_embedding:
             self.embed_positions = LearnedPositionalEmbedding(
-                self.max_positions, self.cfg.embed_dim, self.padding_idx
+                self.max_positions, self.cfg.embed_dim, self.alphabet.padding_idx
             )
-        self.emb_layer_norm_before = (
-            ESM1bLayerNorm(self.cfg.embed_dim)
-            if self.cfg.emb_layer_norm_before
-            else None
-        )
+        if self.cfg.emb_layer_norm_before:
+            self.emb_layer_norm_before = ESM1bLayerNorm(self.cfg.embed_dim)
+
         self.emb_layer_norm_after = ESM1bLayerNorm(self.cfg.embed_dim)
         self.lm_head = RobertaLMHead(
             embed_dim=self.cfg.embed_dim,
@@ -128,21 +127,22 @@ class ProteinBertModel(nn.Module):
             repr_layers = []
 
         assert tokens.ndim == 2
-        padding_mask = tokens.eq(self.padding_idx)  # B, T
+        padding_mask = tokens.eq(self.alphabet.padding_idx)  # B, T
 
         x = self.embed_scale * self.embed_tokens(tokens)
 
         if self.cfg.token_dropout:
-            x.masked_fill_((tokens == self.mask_idx).unsqueeze(-1), 0.0)
+            x.masked_fill_((tokens == self.alphabet.mask_idx).unsqueeze(-1), 0.0)
             # x: B x T x C
             mask_ratio_train = 0.15 * 0.8
             src_lengths = (~padding_mask).sum(-1)
-            mask_ratio_observed = (tokens == self.mask_idx).sum(
+            x.masked_fill_((tokens == self.alphabet.mask_idx).unsqueeze(-1), 0.0)
+            mask_ratio_observed = (tokens == self.alphabet.mask_idx).sum(
                 -1
             ).float() / src_lengths
             x = x * (1 - mask_ratio_train) / (1 - mask_ratio_observed)[:, None, None]
 
-        if not self.cfg.rope_embedding:
+        if self.embed_positions is not None:
             x = x + self.embed_positions(tokens)
 
         if self.emb_layer_norm_before is not None:

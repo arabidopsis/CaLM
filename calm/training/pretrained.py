@@ -1,7 +1,7 @@
 import torch
 
-from calm.sequence import CodonSequence, Sequence
-from calm.model import ProteinBertModel
+from ..sequence import CodonSequence, Sequence
+from ..model import ProteinBertModel
 from .training import CodonModel
 
 

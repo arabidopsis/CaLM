@@ -1,6 +1,6 @@
 import os
-import pytorch_lightning as pl
 from pathlib import Path
+import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint
 
 

@@ -1,4 +1,5 @@
 """Data modules for PyTorch Lightning."""
+
 from dataclasses import dataclass
 from argparse import Namespace, ArgumentParser
 from pathlib import Path
@@ -6,13 +7,13 @@ import torch
 import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split  # type: ignore
 
-from calm.alphabet import Alphabet
-from calm.dataset import SequenceDataset
-from calm.pipeline import (
+from ..alphabet import Alphabet
+from ..dataset import SequenceDataset
+from ..pipeline import (
     standard_pipeline,
     PipelineCfg,
 )
-from calm.utils import ArgparseMixin
+from ..utils import ArgparseMixin
 
 
 @dataclass
@@ -29,7 +30,7 @@ class CodonDataModule(pl.LightningDataModule):
         return CondonDataModuleCfg.add_args(argparser)
 
     @classmethod
-    def create(cls, args: Namespace) -> CondonDataModuleCfg:
+    def create_cfg(cls, args: Namespace) -> CondonDataModuleCfg:
         return CondonDataModuleCfg.create(args)
 
     def __init__(
