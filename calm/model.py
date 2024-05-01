@@ -45,7 +45,7 @@ class ProteinBertModelCfg(ArgparseMixin):
     emb_layer_norm_before: bool = False
     token_dropout: bool = False
     alphabet: str = "CodonModel"
-    max_positions: int = 1024
+
 
 class ProteinBertModel(nn.Module):
 
@@ -60,16 +60,23 @@ class ProteinBertModel(nn.Module):
     def __init__(self, args: Namespace):
         super().__init__()
         self.cfg = ProteinBertModel.create_cfg(args)
+        max_positions = getattr(args, "max_positions", None)
+        if max_positions is None:
+            raise ValueError("no max_positions in args Namespace")
+        self.max_positions = int(max_positions)
+
         self.alphabet = alphabet = Alphabet.from_architecture(self.cfg.alphabet)
         self.alphabet_size = len(alphabet)
+
         self.padding_idx = alphabet.padding_idx
         self.mask_idx = alphabet.mask_idx
         self.cls_idx = alphabet.cls_idx
         self.eos_idx = alphabet.eos_idx
         self.prepend_bos = alphabet.prepend_bos
         self.append_eos = alphabet.append_eos
-        self.emb_layer_norm_before = self.cfg.emb_layer_norm_before
+
         self.model_version = "ESM-1b"
+        self.emb_layer_norm_before : nn.Module | None = None
         self._init_submodules_esm1b()
 
     def _init_submodules_common(self):
@@ -96,10 +103,12 @@ class ProteinBertModel(nn.Module):
         self.embed_scale = 1
         if not self.cfg.rope_embedding:
             self.embed_positions = LearnedPositionalEmbedding(
-                self.cfg.max_positions, self.cfg.embed_dim, self.padding_idx
+                self.max_positions, self.cfg.embed_dim, self.padding_idx
             )
         self.emb_layer_norm_before = (
-            ESM1bLayerNorm(self.cfg.embed_dim) if self.emb_layer_norm_before else None
+            ESM1bLayerNorm(self.cfg.embed_dim)
+            if self.cfg.emb_layer_norm_before
+            else None
         )
         self.emb_layer_norm_after = ESM1bLayerNorm(self.cfg.embed_dim)
         self.lm_head = RobertaLMHead(
@@ -128,7 +137,7 @@ class ProteinBertModel(nn.Module):
         if not self.cfg.rope_embedding:
             x = x + self.embed_positions(tokens)
 
-        if self.emb_layer_norm_before:
+        if self.emb_layer_norm_before is not None:
             x = self.emb_layer_norm_before(x)
         if padding_mask is not None:
             x = x * (1 - padding_mask.unsqueeze(-1).type_as(x))

@@ -110,7 +110,7 @@ codonseq_toks = {
 }
 
 
-class Alphabet(object):
+class Alphabet:
     def __init__(
         self,
         standard_toks: Sequence[str],
@@ -125,21 +125,28 @@ class Alphabet(object):
         self.append_toks = list(append_toks)
         self.prepend_bos = prepend_bos
         self.append_eos = append_eos
-        self.use_codons = use_codons
 
         self.all_toks = list(self.prepend_toks)
         self.all_toks.extend(self.standard_toks)
         self.all_toks.extend(self.append_toks)
 
         self.tok_to_idx = {tok: i for i, tok in enumerate(self.all_toks)}
+        self.all_special_tokens = ["<eos>", "<unk>", "<pad>", "<cls>", "<mask>"]
+        self.unique_no_split_tokens = self.all_toks
 
         self.unk_idx = self.tok_to_idx["<unk>"]
         self.padding_idx = self.get_idx("<pad>")
         self.cls_idx = self.get_idx("<cls>")
         self.mask_idx = self.get_idx("<mask>")
         self.eos_idx = self.get_idx("<eos>")
-        self.all_special_tokens = ["<eos>", "<unk>", "<pad>", "<cls>", "<mask>"]
-        self.unique_no_split_tokens = self.all_toks
+        # self.coding_toks = self.standard_toks
+        if use_codons:
+            self.coding_toks = [
+                "".join(letters)
+                for letters in itertools.product(["A", "U", "C", "G"], repeat=3)
+            ]
+        else:
+            self.coding_toks = list("ARNDCQEGHILKMFPSTWYV")
 
     def __len__(self):
         return len(self.all_toks)
@@ -186,7 +193,7 @@ class Alphabet(object):
     def _tokenize(self, text) -> str:
         return text.split()
 
-    def tokenize(self, text, **kwargs) -> List[str]:
+    def tokenize(self, text:str, **kwargs) -> list[str]:
         """
         Inspired by https://github.com/huggingface/transformers/blob/master/src/transformers/tokenization_utils.py
         Converts a string in a sequence of tokens, using the tokenizer.
@@ -199,7 +206,7 @@ class Alphabet(object):
             :obj:`List[str]`: The list of tokens.
         """
 
-        def split_on_token(tok, text):
+        def split_on_token(tok:str, text:str) -> list[str]:
             result = []
             split_text = text.split(tok)
             for i, sub_text in enumerate(split_text):
@@ -226,11 +233,11 @@ class Alphabet(object):
                     result.append(tok)
             return result
 
-        def split_on_tokens(tok_list, text):
+        def split_on_tokens(tok_list: list[str], text:str) -> list[str]:
             if not text.strip():
                 return []
 
-            tokenized_text = []
+            tokenized_text: list[str] = []
             text_list = [text]
             for tok in tok_list:
                 tokenized_text = []
@@ -262,20 +269,20 @@ class Alphabet(object):
         return [self.tok_to_idx[tok] for tok in self.tokenize(text)]
 
 
-class BatchConverter(object):
+class BatchConverter:
     """Callable to convert an unprocessed (labels + strings) batch to a
     processed (labels + tensor) batch.
     """
 
-    def __init__(self, alphabet):
+    def __init__(self, alphabet:Alphabet):
         self.alphabet = alphabet
 
-    def __call__(self, raw_batch: Sequence[Tuple[str, str]]):
+    def __call__(self, raw_batch: Sequence[tuple[str, str]]) -> tuple[list[str], list[str], torch.Tensor]:
         # RoBERTa uses an eos token, while ESM-1 does not.
         batch_size = len(raw_batch)
         batch_labels, seq_str_list = zip(*raw_batch)
         seq_encoded_list = [self.alphabet.encode(seq_str) for seq_str in seq_str_list]
-        max_len = max(len(seq_encoded) for seq_encoded in seq_encoded_list)
+        max_len = len(max(seq_encoded_list, key=len))
         tokens = torch.empty(
             (
                 batch_size,

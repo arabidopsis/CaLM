@@ -16,12 +16,11 @@ class PeriodicCheckpoint(ModelCheckpoint):
     def on_before_zero_grad(
         self, trainer: pl.Trainer, pl_module: pl.LightningModule, *args, **kwargs
     ):
-        if pl_module.global_step % self.every == 0:
+        if pl_module.global_step > 0 and pl_module.global_step % self.every == 0:
             assert self.dirpath is not None
             current = Path(self.dirpath) / f"latest-{pl_module.global_step}.ckpt"
             # prev = (
             #     Path(self.dirpath) / f"latest-{pl_module.global_step - self.every}.ckpt"
             # )
-            print('saving', current)
+            print("saving", current)
             trainer.save_checkpoint(current)
-

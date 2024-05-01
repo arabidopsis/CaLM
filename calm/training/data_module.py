@@ -1,7 +1,6 @@
 """Data modules for PyTorch Lightning."""
-
-from argparse import Namespace, ArgumentParser
 from dataclasses import dataclass
+from argparse import Namespace, ArgumentParser
 from pathlib import Path
 import torch
 import pytorch_lightning as pl
@@ -10,22 +9,15 @@ from sklearn.model_selection import train_test_split  # type: ignore
 from calm.alphabet import Alphabet
 from calm.dataset import SequenceDataset
 from calm.pipeline import (
-    Pipeline,
-    DataCollator,
-    DataTrimmer,
-    DataPadder,
-    DataPreprocessor,
-    # CodonRandomizer,
-    # DataPreprocessorForDualData,
+    standard_pipeline,
+    PipelineCfg,
 )
 from calm.utils import ArgparseMixin
 
 
 @dataclass
-class CondonDataModuleCfg(ArgparseMixin):
-    mask_proportion: float = 0.25
-    leave_percent: float = 0.1
-    mask_percent: float = 0.8
+class CondonDataModuleCfg(PipelineCfg, ArgparseMixin):
+    pass
 
 
 class CodonDataModule(pl.LightningDataModule):
@@ -47,7 +39,6 @@ class CodonDataModule(pl.LightningDataModule):
         *,
         fasta_file: Path,
         batch_size: int,
-        max_positions: int,
         random_seed: int = 42,
         test_size: float = 0.01,
     ):
@@ -56,19 +47,21 @@ class CodonDataModule(pl.LightningDataModule):
         self.test_size = test_size
         self.batch_size = batch_size
         self.random_seed = random_seed
-        self.pipeline = Pipeline(
-            [
-                DataCollator(
-                    args.mask_proportion,
-                    args.mask_percent,
-                    args.leave_percent,
-                    alphabet,
-                ),
-                DataTrimmer(max_positions, alphabet),
-                DataPadder(max_positions, alphabet),
-                DataPreprocessor(alphabet),
-            ]
-        )
+        # self.pipeline = Pipeline(
+        #     [
+        #         DataCollator(
+        #             args.mask_proportion,
+        #             args.mask_percent,
+        #             args.leave_percent,
+        #             alphabet,
+        #         ),
+        #         DataTrimmer(max_positions, alphabet),
+        #         DataPadder(max_positions, alphabet),
+        #         DataPreprocessor(alphabet),
+        #     ]
+        # )
+
+        self.pipeline = standard_pipeline(args, alphabet=alphabet)
 
         self.train_data: torch.utils.data.Dataset | None = None
         self.val_data: torch.utils.data.Dataset | None = None

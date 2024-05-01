@@ -13,19 +13,27 @@ def _split_into_codons(seq: str):
 class Sequence(abc.ABC):
     """Abstract base class for sequence data."""
 
-    _seq: str
+    # _seq: str
+    _tokens: list[str]
 
-    @property
-    def seq(self) -> str:
-        return self._seq
+    # @property
+    # def seq(self) -> str:
+    #     return self._seq
 
-    @property
-    def tokens(self) -> list[str]:
-        return self._seq.split()
+    # @property
+    # def tokens(self) -> list[str]:
+    #     return self._seq.split()
 
     def _sanitize(self, tokens: list[str]):
         return [x.strip() for x in tokens if x.strip() != ""]
+    
+    @property
+    def seq(self) -> str:
+        return " ".join(self._tokens)
 
+    @property
+    def tokens(self) -> list[str]:
+        return self._tokens
 
 class CodonSequence(Sequence):
     """Class containing a sequence of codons.
@@ -42,10 +50,23 @@ class CodonSequence(Sequence):
     def __init__(self, seq_: str | Seq):
         super().__init__()
         seq = str(seq_)
-        _tokens = (
-            ["<cls>"]
-            + list(_split_into_codons(seq.replace("T", "U").replace(" ", "")))
-            + ["<eos>"]
-        )
-        _tokens = self._sanitize(_tokens)
-        self._seq = " ".join(_tokens)
+        _tokens = [
+            "<cls>",
+            *_split_into_codons(seq.replace("T", "U").replace(" ", "")),
+            "<eos>",
+        ]
+        self._tokens = self._sanitize(_tokens)
+        # self._seq = " ".join(_tokens)
+
+
+class AminoAcidSequence(Sequence):
+    def __init__(self, seq_: str | Seq):
+        super().__init__()
+        seq = str(seq_)
+        _tokens = [
+            "<cls>",
+            *seq.replace(" ", "").split(),
+            "<eos>",
+        ]
+        self._tokens = self._sanitize(_tokens)
+        # self._seq = " ".join(_tokens)

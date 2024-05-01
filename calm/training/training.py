@@ -153,17 +153,17 @@ def train():
     dm_cfg = CodonDataModule.create(args)
 
     # model
-    # arguments and their types will be save to the chpt files
+    # arguments and their types will be save to the ckpt files
     model = CodonModel(args)
 
+    assert model.model.max_positions == dm_cfg.max_positions
+
     codon_cfg = model.cfg
-    model_cfg = model.model.cfg
 
     # data
     datamodule = CodonDataModule(
         dm_cfg,
         model.model.alphabet,
-        max_positions=model_cfg.max_positions,
         fasta_file=Path(training_cfg.fasta_file).expanduser(),
         batch_size=codon_cfg.batch_size,
     )

@@ -1,18 +1,25 @@
 """Utilities to preprocess data for training."""
 
+from dataclasses import dataclass
 import abc
-import itertools
 from copy import deepcopy
 from typing import NamedTuple, Iterator, TypedDict
 
-# from collections import namedtuple
-from .alphabet import Alphabet
 
 import torch
 import numpy as np
 
 
+from .alphabet import Alphabet
 from .sequence import Sequence
+
+
+@dataclass
+class PipelineCfg:
+    mask_proportion: float = 0.25
+    leave_percent: float = 0.1
+    mask_percent: float = 0.8
+    max_positions: int = 1024
 
 
 def _split_array(array: np.ndarray, chunks: list[int]) -> list[np.ndarray]:
@@ -100,7 +107,7 @@ class Pipeline:
     """
 
     def __init__(
-        self, pipeline: list[ PipelineEntrypoint | PipelineBlock | PipelineEndpoint]
+        self, pipeline: list[PipelineEntrypoint | PipelineBlock | PipelineEndpoint]
     ):
         """Initialize the pipeline.
 
@@ -133,8 +140,8 @@ class Pipeline:
             sequence=data_
         )
         for transform in self.pipeline:
-            data = transform(data) # type: ignore
-        return data # type: ignore
+            data = transform(data)  # type: ignore
+        return data  # type: ignore
 
 
 class DataCollator(PipelineEntrypoint):
@@ -144,23 +151,11 @@ class DataCollator(PipelineEntrypoint):
 
     def __init__(
         self,
-        mask_proportion: float,
-        mask_percent: float,
-        leave_percent: float,
+        cfg: PipelineCfg,
         alphabet: Alphabet,
     ):
-        self.mask_proportion = mask_proportion
-        self.mask_percent = mask_percent
-        self.leave_percent = leave_percent
+        self.cfg = cfg
         self.alphabet = alphabet
-
-        if self.alphabet.use_codons:
-            self.coding_toks = [
-                "".join(letters)
-                for letters in itertools.product(["A", "U", "C", "G"], repeat=3)
-            ]
-        else:
-            self.coding_toks = list("ARNDCQEGHILKMFPSTWYV")
 
     def __call__(self, input_: PipelineInput) -> PipelineData:
         output = PipelineData(ground_truth=[], sequence=[], target_mask=[])
@@ -176,9 +171,9 @@ class DataCollator(PipelineEntrypoint):
     def _mask_seq(self, tokens_: list[str]) -> tuple[list[str], np.ndarray]:
         tokens = deepcopy(tokens_)
         num_tokens = len(tokens)
-        num_changed_tokens = int(num_tokens * self.mask_proportion)
-        num_to_mask = int(num_changed_tokens * self.mask_percent)
-        num_to_leave = int(num_changed_tokens * self.leave_percent)
+        num_changed_tokens = int(num_tokens * self.cfg.mask_proportion)
+        num_to_mask = int(num_changed_tokens * self.cfg.mask_percent)
+        num_to_leave = int(num_changed_tokens * self.cfg.leave_percent)
         num_to_change = num_changed_tokens - num_to_mask - num_to_leave
 
         # Apply masking
@@ -193,7 +188,7 @@ class DataCollator(PipelineEntrypoint):
         for idx_mask in idxs_mask:
             tokens[idx_mask] = "<mask>"
         for idx_change in idxs_change:
-            tokens[idx_change] = np.random.choice(self.coding_toks)
+            tokens[idx_change] = np.random.choice(self.alphabet.coding_toks)
 
         # Generate masks
         mask = np.zeros(num_tokens)
@@ -306,3 +301,17 @@ class DataPreprocessor(PipelineEndpoint):
 
     def _compute_mask(self, mask_list: list[np.ndarray]) -> torch.Tensor:
         return torch.tensor(np.stack(mask_list, axis=0))
+
+
+def standard_pipeline(cfg: PipelineCfg, alphabet: Alphabet) -> Pipeline:
+    return Pipeline(
+        [
+            DataCollator(
+                cfg,
+                alphabet,
+            ),
+            DataTrimmer(cfg.max_positions, alphabet),
+            DataPadder(cfg.max_positions, alphabet),
+            DataPreprocessor(alphabet),
+        ]
+    )
