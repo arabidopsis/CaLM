@@ -13,9 +13,10 @@ from pytorch_lightning.callbacks import LearningRateMonitor
 
 from data_module import CodonDataModule
 from checkpointing import PeriodicCheckpoint
-from calm.alphabet import Alphabet
-from calm.model import ProteinBertModel, ProteinBertModelCfg
+
+from calm.model import ProteinBertModel
 from calm.utils import ArgparseMixin, optional
+from calm.alphabet import Alphabet
 
 
 @dataclass
@@ -32,13 +33,15 @@ class CodonModelCfg(ArgparseMixin):
 class CodonModel(pl.LightningModule):
     """PyTorch Lightning module for standard training."""
 
-    def __init__(
-        self, cfg: CodonModelCfg, model_cfg: ProteinBertModelCfg, alphabet: Alphabet
-    ):
+    @classmethod
+    def add_args(cls, parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+        return CodonModelCfg.add_args(parser)
+
+    def __init__(self, args: argparse.Namespace):
         super().__init__()
-        self.args = cfg
-        self.alphabet = alphabet
-        self.model = ProteinBertModel(model_cfg, alphabet)
+        self.cfg = CodonModelCfg.create(args)
+
+        self.model = ProteinBertModel(args)
 
         def init_weights(module):
             if isinstance(module, (torch.nn.Linear, torch.nn.Embedding)):
@@ -52,35 +55,39 @@ class CodonModel(pl.LightningModule):
         self.loss_fn = nn.CrossEntropyLoss(reduction="mean", ignore_index=-100)
         self.save_hyperparameters()
 
+    @property
+    def alphabet(self) -> Alphabet:
+        return self.model.alphabet
+
     def forward(self, x):
         return self.model(x)
 
     def configure_optimizers(self):
         optimizer = torch.optim.AdamW(
             self.parameters(),
-            lr=self.args.learning_rate,
-            weight_decay=self.args.weight_decay,
+            lr=self.cfg.learning_rate,
+            weight_decay=self.cfg.weight_decay,
         )
 
-        if self.args.lr_scheduler == "none":
+        if self.cfg.lr_scheduler == "none":
             return optimizer
-        elif self.args.lr_scheduler == "warmup_sqrt":
+        elif self.cfg.lr_scheduler == "warmup_sqrt":
 
             def schedule(global_step):
-                if global_step < self.args.warmup_steps:
-                    return (global_step + 1) / self.args.warmup_steps
+                if global_step < self.cfg.warmup_steps:
+                    return (global_step + 1) / self.cfg.warmup_steps
                 else:
-                    return np.sqrt(self.args.warmup_steps / global_step)
+                    return np.sqrt(self.cfg.warmup_steps / global_step)
 
-        elif self.args.lr_scheduler == "warmup_cosine":
+        elif self.cfg.lr_scheduler == "warmup_cosine":
 
             def schedule(global_step):
-                if global_step < self.args.warmup_steps:
-                    return (global_step + 1) / self.args.warmup_steps
+                if global_step < self.cfg.warmup_steps:
+                    return (global_step + 1) / self.cfg.warmup_steps
                 else:
                     progress = (
-                        global_step - self.args.warmup_steps
-                    ) / self.args.num_steps
+                        global_step - self.cfg.warmup_steps
+                    ) / self.cfg.num_steps
                     return max(0.0, 0.5 * (1.0 + math.cos(math.pi * progress)))
 
         else:
@@ -102,11 +109,11 @@ class CodonModel(pl.LightningModule):
         output = self.model(data)
         likelihoods = output["logits"]
         loss = self.loss_fn(
-            likelihoods.view(-1, len(self.alphabet.all_toks)), labels.view(-1)
+            likelihoods.view(-1, len(self.model.alphabet.all_toks)), labels.view(-1)
         )
 
-        if batch_idx % self.args.accumulate_gradients == 0:
-            self.log("train_loss", loss, batch_size=self.args.batch_size)
+        if batch_idx % self.cfg.accumulate_gradients == 0:
+            self.log("train_loss", loss, batch_size=self.cfg.batch_size)
         return loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -117,17 +124,18 @@ class CodonModel(pl.LightningModule):
         output = self.model(data)
         likelihoods = output["logits"]
         loss = self.loss_fn(
-            likelihoods.view(-1, len(self.alphabet.all_toks)), labels.view(-1)
+            likelihoods.view(-1, len(self.model.alphabet.all_toks)), labels.view(-1)
         )
-        self.log("val_loss", loss, batch_size=self.args.batch_size)
+        self.log("val_loss", loss, batch_size=self.cfg.batch_size)
         return loss
 
 
 @dataclass
 class TrainingCfg(ArgparseMixin):
+    name: str = "training-run"
     ckpt_path: str | None = field(default=None, metadata=dict(type=optional(str)))
-    data: str = "training_data.fasta"
-    no_progress_bar: bool = field(default=False, metadata=dict(action="store_true"))
+    fasta_file: str = "training_data.fasta"
+    no_progress_bar: bool = False
 
 
 def train():
@@ -136,29 +144,32 @@ def train():
 
     parser = ProteinBertModel.add_args(parser)
     parser = CodonDataModule.add_args(parser)
-    parser = CodonModelCfg.add_args(parser)
+    parser = CodonModel.add_args(parser)
     parser = TrainingCfg.add_args(parser)
+
     args = parser.parse_args()
 
     training_cfg = TrainingCfg.create(args)
-    codon_cfg = CodonModelCfg.create(args)
-    model_cfg = ProteinBertModelCfg.create(args)
     dm_cfg = CodonDataModule.create(args)
 
+    # model
+    # arguments and their types will be save to the chpt files
+    model = CodonModel(args)
+
+    codon_cfg = model.cfg
+    model_cfg = model.model.cfg
+
     # data
-    alphabet = Alphabet.from_architecture("CodonModel")
     datamodule = CodonDataModule(
         dm_cfg,
-        alphabet,
-        str(Path(training_cfg.data).expanduser()),
-        codon_cfg.batch_size,
+        model.model.alphabet,
+        max_positions=model_cfg.max_positions,
+        fasta_file=Path(training_cfg.fasta_file).expanduser(),
+        batch_size=codon_cfg.batch_size,
     )
 
-    # model
-    model = CodonModel(codon_cfg, model_cfg, alphabet)
-
     # training
-    name = "training-run"
+    name = training_cfg.name
     # logger = WandbLogger(name=name, project='12layers', version='restart3')
     logger = CSVLogger("logs", name=name)
     trainer = pl.Trainer(
@@ -169,7 +180,7 @@ def train():
         log_every_n_steps=1,
         # val_check_interval=100*args.accumulate_gradients,
         # accumulate_grad_batches=args.accumulate_gradients,
-        limit_val_batches=0.25,
+        limit_val_batches=1.0,
         accelerator="auto",
         enable_progress_bar=not training_cfg.no_progress_bar,
         callbacks=[

@@ -4,11 +4,9 @@ This code has been modified from the original implementation
 by Facebook Research, describing its ESM-1b paper."""
 
 from argparse import ArgumentParser, Namespace
-import math
 from dataclasses import dataclass, field
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 from .modules import (
     TransformerLayer,
@@ -23,12 +21,8 @@ from .utils import ArgparseMixin
 
 @dataclass
 class ProteinBertModelCfg(ArgparseMixin):
-    num_layers: int = field(
-        default=12, metadata=dict(help="number of layers")
-    )
-    embed_dim: int = field(
-        default=768, metadata=dict(help="embedding dimension")
-    )
+    num_layers: int = field(default=12, metadata=dict(help="number of layers"))
+    embed_dim: int = field(default=768, metadata=dict(help="embedding dimension"))
     attention_dropout: float = field(
         default=0.0, metadata=dict(help="dropout on attention")
     )
@@ -49,7 +43,9 @@ class ProteinBertModelCfg(ArgparseMixin):
         metadata=dict(help="number of attention heads"),
     )
     emb_layer_norm_before: bool = False
-
+    token_dropout: bool = False
+    alphabet: str = "CodonModel"
+    max_positions: int = 1024
 
 class ProteinBertModel(nn.Module):
 
@@ -58,12 +54,13 @@ class ProteinBertModel(nn.Module):
         return ProteinBertModelCfg.add_args(parser)
 
     @classmethod
-    def create(cls, args: Namespace) -> ProteinBertModelCfg:
+    def create_cfg(cls, args: Namespace) -> ProteinBertModelCfg:
         return ProteinBertModelCfg.create(args)
 
-    def __init__(self, args: ProteinBertModelCfg, alphabet: Alphabet):
+    def __init__(self, args: Namespace):
         super().__init__()
-        self.args = args
+        self.cfg = ProteinBertModel.create_cfg(args)
+        self.alphabet = alphabet = Alphabet.from_architecture(self.cfg.alphabet)
         self.alphabet_size = len(alphabet)
         self.padding_idx = alphabet.padding_idx
         self.mask_idx = alphabet.mask_idx
@@ -71,42 +68,42 @@ class ProteinBertModel(nn.Module):
         self.eos_idx = alphabet.eos_idx
         self.prepend_bos = alphabet.prepend_bos
         self.append_eos = alphabet.append_eos
-        self.emb_layer_norm_before = self.args.emb_layer_norm_before
+        self.emb_layer_norm_before = self.cfg.emb_layer_norm_before
         self.model_version = "ESM-1b"
         self._init_submodules_esm1b()
 
     def _init_submodules_common(self):
         self.embed_tokens = nn.Embedding(
-            self.alphabet_size, self.args.embed_dim, padding_idx=self.padding_idx
+            self.alphabet_size, self.cfg.embed_dim, padding_idx=self.padding_idx
         )
         self.layers = nn.ModuleList(
             [
                 TransformerLayer(
-                    self.args.embed_dim,
-                    self.args.ffn_embed_dim,
-                    self.args.attention_heads,
-                    attention_dropout=self.args.attention_dropout,
+                    self.cfg.embed_dim,
+                    self.cfg.ffn_embed_dim,
+                    self.cfg.attention_heads,
+                    attention_dropout=self.cfg.attention_dropout,
                     add_bias_kv=(self.model_version != "ESM-1b"),
                     use_esm1b_layer_norm=(self.model_version == "ESM-1b"),
-                    rope_embedding=self.args.rope_embedding,
+                    rope_embedding=self.cfg.rope_embedding,
                 )
-                for _ in range(self.args.num_layers)
+                for _ in range(self.cfg.num_layers)
             ]
         )
 
     def _init_submodules_esm1b(self):
         self._init_submodules_common()
         self.embed_scale = 1
-        if not self.args.rope_embedding:
+        if not self.cfg.rope_embedding:
             self.embed_positions = LearnedPositionalEmbedding(
-                self.args.max_positions, self.args.embed_dim, self.padding_idx
+                self.cfg.max_positions, self.cfg.embed_dim, self.padding_idx
             )
         self.emb_layer_norm_before = (
-            ESM1bLayerNorm(self.args.embed_dim) if self.emb_layer_norm_before else None
+            ESM1bLayerNorm(self.cfg.embed_dim) if self.emb_layer_norm_before else None
         )
-        self.emb_layer_norm_after = ESM1bLayerNorm(self.args.embed_dim)
+        self.emb_layer_norm_after = ESM1bLayerNorm(self.cfg.embed_dim)
         self.lm_head = RobertaLMHead(
-            embed_dim=self.args.embed_dim,
+            embed_dim=self.cfg.embed_dim,
             output_dim=self.alphabet_size,
             weight=self.embed_tokens.weight,
         )
@@ -118,7 +115,7 @@ class ProteinBertModel(nn.Module):
 
         x = self.embed_scale * self.embed_tokens(tokens)
 
-        if getattr(self.args, "token_dropout", False):
+        if self.cfg.token_dropout:
             x.masked_fill_((tokens == self.mask_idx).unsqueeze(-1), 0.0)
             # x: B x T x C
             mask_ratio_train = 0.15 * 0.8
@@ -128,7 +125,7 @@ class ProteinBertModel(nn.Module):
             ).float() / src_lengths
             x = x * (1 - mask_ratio_train) / (1 - mask_ratio_observed)[:, None, None]
 
-        if not self.args.rope_embedding:
+        if not self.cfg.rope_embedding:
             x = x + self.embed_positions(tokens)
 
         if self.emb_layer_norm_before:
@@ -189,4 +186,4 @@ class ProteinBertModel(nn.Module):
 
     @property
     def num_layers(self):
-        return self.args.num_layers
+        return self.cfg.num_layers

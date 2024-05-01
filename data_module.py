@@ -1,9 +1,8 @@
 """Data modules for PyTorch Lightning."""
 
 from argparse import Namespace, ArgumentParser
-from typing import Optional
 from dataclasses import dataclass
-
+from pathlib import Path
 import torch
 import pytorch_lightning as pl
 from sklearn.model_selection import train_test_split  # type: ignore
@@ -24,7 +23,6 @@ from calm.utils import ArgparseMixin
 
 @dataclass
 class CondonDataModuleCfg(ArgparseMixin):
-    max_positions: int = 1024
     mask_proportion: float = 0.25
     leave_percent: float = 0.1
     mask_percent: float = 0.8
@@ -46,13 +44,15 @@ class CodonDataModule(pl.LightningDataModule):
         self,
         args: CondonDataModuleCfg,
         alphabet: Alphabet,
-        data_dir: str,
+        *,
+        fasta_file: Path,
         batch_size: int,
+        max_positions: int,
         random_seed: int = 42,
         test_size: float = 0.01,
     ):
         super().__init__()
-        self.data_dir = data_dir
+        self.fasta_file = fasta_file
         self.test_size = test_size
         self.batch_size = batch_size
         self.random_seed = random_seed
@@ -64,17 +64,17 @@ class CodonDataModule(pl.LightningDataModule):
                     args.leave_percent,
                     alphabet,
                 ),
-                DataTrimmer(args.max_positions, alphabet),
-                DataPadder(args.max_positions, alphabet),
+                DataTrimmer(max_positions, alphabet),
+                DataPadder(max_positions, alphabet),
                 DataPreprocessor(alphabet),
             ]
         )
 
-        self.train_data = None
-        self.val_data = None
+        self.train_data: torch.utils.data.Dataset | None = None
+        self.val_data: torch.utils.data.Dataset | None = None
 
-    def setup(self, stage: Optional[str] = None):
-        dataset = SequenceDataset(self.data_dir, codon_sequence=True)
+    def setup(self, stage: str | None = None) -> None:
+        dataset = SequenceDataset(self.fasta_file, codon_sequence=True)
         self.train_data, self.val_data = train_test_split(
             dataset,
             test_size=self.test_size,
@@ -82,7 +82,8 @@ class CodonDataModule(pl.LightningDataModule):
             random_state=self.random_seed,
         )
 
-    def train_dataloader(self):
+    def train_dataloader(self) -> torch.utils.data.DataLoader:
+        assert self.train_data is not None
         return torch.utils.data.DataLoader(
             self.train_data,
             num_workers=3,
@@ -90,7 +91,8 @@ class CodonDataModule(pl.LightningDataModule):
             collate_fn=self.pipeline,
         )
 
-    def val_dataloader(self):
+    def val_dataloader(self) -> torch.utils.data.DataLoader:
+        assert self.val_data is not None
         return torch.utils.data.DataLoader(
             self.val_data,
             num_workers=3,

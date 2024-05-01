@@ -1,5 +1,5 @@
 """Common class for sequence datasets."""
-
+from pathlib import Path
 import torch
 from Bio import SeqIO
 
@@ -13,7 +13,7 @@ from .sequence import (
 class SequenceDataset(torch.utils.data.Dataset):
     """Common class for sequence datasets."""
 
-    def __init__(self, fasta_file: str, codon_sequence: bool = True):
+    def __init__(self, fasta_file: Path, codon_sequence: bool = True):
         self.fasta_file = fasta_file
         self.codon_sequence = codon_sequence
         self._sequences, self._titles = [], []

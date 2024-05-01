@@ -5,7 +5,6 @@ import pickle
 import requests
 from argparse import Namespace
 import torch
-from .alphabet import Alphabet
 from .sequence import CodonSequence
 from .model import ProteinBertModel
 
@@ -30,6 +29,7 @@ ARGS = Namespace(
     ffn_embed_dim=768 * 4,
     attention_heads=12,
     emb_layer_norm_before=False,
+    alphabet="CodonModel",
 )
 
 
@@ -40,7 +40,6 @@ class CaLM:
     bioRxiv (2022), doi: 10.1101/2022.12.15.519894."""
 
     def __init__(self, args: Namespace = ARGS, weights_file: str | None = None) -> None:
-        model_cfg = ProteinBertModel.create(args)
         if weights_file is None:
             model_folder = os.path.join(os.path.dirname(__file__), "calm_weights")
             weights_file = os.path.join(model_folder, "calm_weights.ckpt")
@@ -51,9 +50,8 @@ class CaLM:
                 with open(weights_file, "wb") as handle:
                     handle.write(requests.get(url, timeout=300).content)
 
-        self.alphabet = Alphabet.from_architecture("CodonModel")
-        self.model = ProteinBertModel(model_cfg, self.alphabet)
-        self.bc = self.alphabet.get_batch_converter()
+        self.model = ProteinBertModel(args)
+        self.bc = self.model.alphabet.get_batch_converter()
 
         with open(weights_file, "rb") as handle:
             state_dict = pickle.load(handle)
