@@ -134,20 +134,30 @@ class CodonModel(pl.LightningModule):
 class TrainingCfg(ArgparseMixin):
     name: str = "training-run"
     ckpt_path: str | None = field(default=None, metadata=dict(type=optional(str)))
-    fasta_file: str = "training_data.fasta"
     no_progress_bar: bool = False
 
 
-def train():
+def train() -> None:
     # parsingbc
-    parser = argparse.ArgumentParser(prog='python -m calm.training')
+    parser = argparse.ArgumentParser(prog="python -m calm.training")
 
     parser = ProteinBertModel.add_args(parser)
     parser = CodonDataModule.add_args(parser)
     parser = CodonModel.add_args(parser)
     parser = TrainingCfg.add_args(parser)
 
+    parser.add_argument("fasta_files", nargs="*")
+
     args = parser.parse_args()
+    training_data: list[str] = args.fasta_files
+    print(training_data)
+    if not training_data:
+        raise ValueError("no training data")
+    
+    fasta_files = [Path(f).expanduser() for f in training_data]
+
+    if any(not f.exists() for f in fasta_files):
+        raise ValueError("some training files don't exist!")
 
     training_cfg = TrainingCfg.create(args)
     dm_cfg = CodonDataModule.create_cfg(args)
@@ -164,7 +174,7 @@ def train():
     datamodule = CodonDataModule(
         dm_cfg,
         model.model.alphabet,
-        fasta_file=Path(training_cfg.fasta_file).expanduser(),
+        fasta_files=fasta_files,
         batch_size=codon_cfg.batch_size,
     )
 

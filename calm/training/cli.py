@@ -43,11 +43,11 @@ def convert(weights_file: str, out: str) -> None:
 
 @calm.command()
 @click.option("-s", "--start", default=0, help="start")
-@click.option("-n", "--number", default=200, help="number of sequences")
+@click.option("-n", "--number", default=200, help="number of sequences", show_default=True)
 @click.argument("fasta_file", type=click.File(mode='rt'))
 @click.argument("out", type=click.File(mode='wt'))
 def fasta(fasta_file: IO[str], out: IO[str], number: int, start:int) -> None:
-    """Convert lighting Model to torch model data"""
+    """slice a few sequences out of a fasta file for testing data"""
     from Bio import SeqIO
     from itertools import islice
 
