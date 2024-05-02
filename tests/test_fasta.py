@@ -1,6 +1,6 @@
 import sys
 import random
-from calm.fasta import RandomFasta, CollectionFasta
+from calm.fasta import from_fastas
 from Bio import SeqIO
 
 
@@ -13,21 +13,24 @@ def ok(r, rec):
 def test():
 
     ffs = sys.argv[1:]
+    if not ffs:
+        print("no fasta files")
+        return
 
-    fasta = CollectionFasta(ffs) if len(ffs) > 1 else RandomFasta(ffs[0])
+    fasta = from_fastas(ffs)
 
     full = []
     for ff in ffs:
         with open(ff, encoding="utf8") as h:
-            for rec in SeqIO.parse(h, "fasta"):
-                full.append(rec)
+            full.extend(SeqIO.parse(h, "fasta"))
 
+    assert len(full) == len(fasta)
+    
     for i, rec in enumerate(full):
         r = fasta[i]
         ok(r, rec)
-    assert len(full) == len(fasta)
+
     total = len(full)
-    print(total)
     for s, e in [
         (s, random.randint(s + 1, total)) for s in random.sample(range(0, total), min(2000, total))
     ]:
