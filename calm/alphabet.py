@@ -4,161 +4,125 @@ This code has been modified from the original implementation
 by Facebook Research, describing its ESM-1b paper."""
 
 import itertools
-from typing import Sequence
+from typing import Sequence, TypedDict
 
 import torch
 
 
-proteinseq_toks = {
-    "toks": [
-        "L",
-        "A",
-        "G",
-        "V",
-        "S",
-        "E",
-        "R",
-        "T",
-        "I",
-        "D",
-        "P",
-        "K",
-        "Q",
-        "N",
-        "F",
-        "Y",
-        "M",
-        "H",
-        "W",
-        "C",
-        "X",
-        "B",
-        "U",
-        "Z",
-        "O",
-        ".",
-        "-",
-    ]
-}
-codonseq_toks = {
-    "toks": [
-        "AAA",
-        "AAU",
-        "AAC",
-        "AAG",
-        "AUA",
-        "AUU",
-        "AUC",
-        "AUG",
-        "ACA",
-        "ACU",
-        "ACC",
-        "ACG",
-        "AGA",
-        "AGU",
-        "AGC",
-        "AGG",
-        "UAA",
-        "UAU",
-        "UAC",
-        "UAG",
-        "UUA",
-        "UUU",
-        "UUC",
-        "UUG",
-        "UCA",
-        "UCU",
-        "UCC",
-        "UCG",
-        "UGA",
-        "UGU",
-        "UGC",
-        "UGG",
-        "CAA",
-        "CAU",
-        "CAC",
-        "CAG",
-        "CUA",
-        "CUU",
-        "CUC",
-        "CUG",
-        "CCA",
-        "CCU",
-        "CCC",
-        "CCG",
-        "CGA",
-        "CGU",
-        "CGC",
-        "CGG",
-        "GAA",
-        "GAU",
-        "GAC",
-        "GAG",
-        "GUA",
-        "GUU",
-        "GUC",
-        "GUG",
-        "GCA",
-        "GCU",
-        "GCC",
-        "GCG",
-        "GGA",
-        "GGU",
-        "GGC",
-        "GGG",
-    ]
-}
+class Tokens(TypedDict):
+    toks: list[str]
+    coding_toks: list[str]
+
+
+proteinseq_toks = Tokens(
+    toks=list("LAGVSERTIDPKQNFYMHWCXBUZO.-"),
+    coding_toks=list("ARNDCQEGHILKMFPSTWYV"),
+)
+CODONS = [
+    "AAA",
+    "AAU",
+    "AAC",
+    "AAG",
+    "AUA",
+    "AUU",
+    "AUC",
+    "AUG",
+    "ACA",
+    "ACU",
+    "ACC",
+    "ACG",
+    "AGA",
+    "AGU",
+    "AGC",
+    "AGG",
+    "UAA",
+    "UAU",
+    "UAC",
+    "UAG",
+    "UUA",
+    "UUU",
+    "UUC",
+    "UUG",
+    "UCA",
+    "UCU",
+    "UCC",
+    "UCG",
+    "UGA",
+    "UGU",
+    "UGC",
+    "UGG",
+    "CAA",
+    "CAU",
+    "CAC",
+    "CAG",
+    "CUA",
+    "CUU",
+    "CUC",
+    "CUG",
+    "CCA",
+    "CCU",
+    "CCC",
+    "CCG",
+    "CGA",
+    "CGU",
+    "CGC",
+    "CGG",
+    "GAA",
+    "GAU",
+    "GAC",
+    "GAG",
+    "GUA",
+    "GUU",
+    "GUC",
+    "GUG",
+    "GCA",
+    "GCU",
+    "GCC",
+    "GCG",
+    "GGA",
+    "GGU",
+    "GGC",
+    "GGG",
+]
+codonseq_toks = Tokens(toks=CODONS, coding_toks=CODONS)
 
 
 class Alphabet:
     def __init__(
         self,
-        standard_toks: Sequence[str],
-        prepend_toks: Sequence[str] = ("<null_0>", "<pad>", "<eos>", "<unk>"),
-        append_toks: Sequence[str] = ("<cls>", "<mask>", "<sep>"),
-        prepend_bos: bool = True,
-        append_eos: bool = False,
-        use_codons: bool = True,
+        tokens: Tokens,
     ):
-        self.standard_toks = list(standard_toks)
-        self.prepend_toks = list(prepend_toks)
-        self.append_toks = list(append_toks)
-        self.prepend_bos = prepend_bos
-        self.append_eos = append_eos
+        self.standard_toks = tokens["toks"]
+        self.coding_toks = tokens["coding_toks"]
 
-        self.all_toks = list(self.prepend_toks)
-        self.all_toks.extend(self.standard_toks)
-        self.all_toks.extend(self.append_toks)
+        self.prepend_toks = ("<cls>", "<pad>", "<eos>", "<unk>")
+        self.append_toks = ("<mask>",)
+        # self.all_special_tokens = ("<eos>", "<unk>", "<pad>", "<cls>", "<mask>")
+        self.prepend_bos = False
+        self.append_eos = False
+
+        self.all_toks = (*self.prepend_toks, *self.standard_toks, *self.append_toks)
 
         self.tok_to_idx = {tok: i for i, tok in enumerate(self.all_toks)}
-        self.all_special_tokens = ["<eos>", "<unk>", "<pad>", "<cls>", "<mask>"]
-        self.unique_no_split_tokens = self.all_toks
+        self.unique_no_split_tokens = set(self.all_toks)
 
         self.unk_idx = self.tok_to_idx["<unk>"]
         self.padding_idx = self.get_idx("<pad>")
         self.cls_idx = self.get_idx("<cls>")
         self.mask_idx = self.get_idx("<mask>")
         self.eos_idx = self.get_idx("<eos>")
-        # self.coding_toks = self.standard_toks
-        if use_codons:
-            self.coding_toks = [
-                "".join(letters)
-                for letters in itertools.product(["A", "U", "C", "G"], repeat=3)
-            ]
-        else:
-            self.coding_toks = list("ARNDCQEGHILKMFPSTWYV")
 
     def __len__(self):
         return len(self.all_toks)
 
-    def get_idx(self, tok):
+    def get_idx(self, tok: str) -> int:
         return self.tok_to_idx.get(tok, self.unk_idx)
 
-    def get_tok(self, ind):
+    def get_tok(self, ind: int) -> str:
         return self.all_toks[ind]
 
-    def to_dict(self):
-        return self.tok_to_idx.copy()
+    # def to_dict(self):
+    #     return self.tok_to_idx.copy()
 
     def get_batch_converter(self):
         return BatchConverter(self)
@@ -166,34 +130,18 @@ class Alphabet:
     @classmethod
     def from_architecture(cls, name: str) -> "Alphabet":
         if name in ("ESM-1b", "roberta_large"):
-            standard_toks = proteinseq_toks["toks"]
-            prepend_toks = ("<cls>", "<pad>", "<eos>", "<unk>")
-            append_toks = ("<mask>",)
-            prepend_bos = False
-            append_eos = False
-            use_codons = False
+            standard_toks = proteinseq_toks
         elif name in ("CodonModel",):
-            standard_toks = codonseq_toks["toks"]
-            prepend_toks = ("<cls>", "<pad>", "<eos>", "<unk>")
-            append_toks = ("<mask>",)
-            prepend_bos = False
-            append_eos = False
-            use_codons = True
+            standard_toks = codonseq_toks
+
         else:
             raise ValueError("Unknown architecture selected")
-        return cls(
-            standard_toks,
-            prepend_toks,
-            append_toks,
-            prepend_bos,
-            append_eos,
-            use_codons,
-        )
+        return cls(standard_toks)
 
-    def _tokenize(self, text:str) -> list[str]:
+    def _tokenize(self, text: str) -> list[str]:
         return text.split()
 
-    def tokenize(self, text:str, **kwargs) -> list[str]:
+    def tokenize(self, text: str, **kwargs) -> list[str]:
         """
         Inspired by https://github.com/huggingface/transformers/blob/master/src/transformers/tokenization_utils.py
         Converts a string in a sequence of tokens, using the tokenizer.
@@ -206,7 +154,7 @@ class Alphabet:
             :obj:`List[str]`: The list of tokens.
         """
 
-        def split_on_token(tok:str, text:str) -> list[str]:
+        def split_on_token(tok: str, text: str) -> list[str]:
             result = []
             split_text = text.split(tok)
             for i, sub_text in enumerate(split_text):
@@ -233,7 +181,7 @@ class Alphabet:
                     result.append(tok)
             return result
 
-        def split_on_tokens(tok_list: list[str], text:str) -> list[str]:
+        def split_on_tokens(tok_list: set[str], text: str) -> list[str]:
             if not text.strip():
                 return []
 
@@ -265,8 +213,11 @@ class Alphabet:
         tokenized_text = split_on_tokens(no_split_token, text)
         return tokenized_text
 
-    def encode(self, text:str) -> list[int]:
+    def encode(self, text: str) -> list[int]:
         return [self.tok_to_idx[tok] for tok in self.tokenize(text)]
+
+    def tokens_ok(self, tokens: list[str]) -> bool:
+        return not bool(set(tokens) - self.unique_no_split_tokens)
 
 
 class BatchConverter:
@@ -274,10 +225,16 @@ class BatchConverter:
     processed (labels + tensor) batch.
     """
 
-    def __init__(self, alphabet:Alphabet):
+    def __init__(self, alphabet: Alphabet):
         self.alphabet = alphabet
 
-    def __call__(self, raw_batch: Sequence[tuple[str, str]]) -> tuple[list[str], list[str], torch.Tensor]:
+    def from_seq(self, seq: str) -> torch.Tensor:
+        _, _, tokens = self([("", seq)])
+        return tokens
+
+    def __call__(
+        self, raw_batch: Sequence[tuple[str, str]]
+    ) -> tuple[list[str], list[str], torch.Tensor]:
         # RoBERTa uses an eos token, while ESM-1 does not.
         batch_size = len(raw_batch)
         batch_labels, seq_str_list = zip(*raw_batch)

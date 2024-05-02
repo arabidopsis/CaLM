@@ -21,8 +21,8 @@ class TrainedModel:
         return model.model
 
     def tokenize(self, seq: Sequence) -> torch.Tensor:
-        _, _, tokens = self.batch_converter([("", seq.seq)])
-        return tokens
+        return self.batch_converter.from_seq(seq.seq)
+
 
     def to_tensor(self, seq: str) -> torch.Tensor:
         model = self.model

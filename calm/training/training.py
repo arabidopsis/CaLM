@@ -8,7 +8,7 @@ import torch
 import numpy as np
 from torch import nn
 import pytorch_lightning as pl
-from pytorch_lightning.loggers import CSVLogger
+from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
 
 from .data_module import CodonDataModule
@@ -137,8 +137,7 @@ class TrainingCfg(ArgparseMixin):
     no_progress_bar: bool = False
 
 
-def train() -> None:
-    # parsingbc
+def init_args() -> tuple[argparse.Namespace, list[Path]]:
     parser = argparse.ArgumentParser(prog="python -m calm.training")
 
     parser = ProteinBertModel.add_args(parser)
@@ -150,22 +149,38 @@ def train() -> None:
 
     args = parser.parse_args()
     training_data: list[str] = args.fasta_files
-    print(training_data)
+
     if not training_data:
         raise ValueError("no training data")
-    
+
     fasta_files = [Path(f).expanduser() for f in training_data]
 
     if any(not f.exists() for f in fasta_files):
         raise ValueError("some training files don't exist!")
+    return args, fasta_files
+
+
+def train() -> None:
+
+    args, fasta_files = init_args()
 
     training_cfg = TrainingCfg.create(args)
     dm_cfg = CodonDataModule.create_cfg(args)
 
     # model
     # arguments and their types will be save to the ckpt files
-    model = CodonModel(args)
 
+    ckpt_path = (
+        None
+        if training_cfg.ckpt_path is None
+        else str(Path(training_cfg.ckpt_path).expanduser())
+    )
+    if ckpt_path:
+        print("loading", ckpt_path)
+        # model.load_state_dict(torch.load(ckpt_path)["state_dict"])
+        model = CodonModel.load_from_checkpoint(ckpt_path, args=args)
+    else:
+        model = CodonModel(args)
     assert model.model.max_positions == dm_cfg.max_positions
 
     codon_cfg = model.cfg
@@ -178,16 +193,12 @@ def train() -> None:
         batch_size=codon_cfg.batch_size,
     )
 
-    ckpt_path = (
-        None
-        if training_cfg.ckpt_path is None
-        else str(Path(training_cfg.ckpt_path).expanduser())
-    )
-
     # training
     name = training_cfg.name
     # logger = WandbLogger(name=name, project='12layers', version='restart3')
-    logger = CSVLogger("logs", name=name)
+    # logger = CSVLogger("logs", name=name)
+    # pip install tensorboard
+    logger = TensorBoardLogger(save_dir="logs", name=name)
     trainer = pl.Trainer(
         num_nodes=1,
         precision="bf16-mixed",
@@ -196,16 +207,17 @@ def train() -> None:
         log_every_n_steps=1,
         # val_check_interval=100*codon_cfg.accumulate_gradients,
         # accumulate_grad_batches=codon_cfg.accumulate_gradients,
-        limit_val_batches=1.0,
+        # limit_val_batches=1.0,
         accelerator="auto",
         enable_progress_bar=not training_cfg.no_progress_bar,
+        # max_time="00:00:01:00",
         callbacks=[
             PeriodicCheckpoint(1000, name),
             LearningRateMonitor(logging_interval="step"),
         ],
     )
 
-    trainer.fit(model, datamodule=datamodule, ckpt_path=ckpt_path)
+    trainer.fit(model, datamodule=datamodule)  # , ckpt_path=ckpt_path)
 
 
 if __name__ == "__main__":

@@ -82,7 +82,7 @@ class CodonDataModule(pl.LightningDataModule):
         assert self.train_data is not None
         return DataLoader(
             self.train_data,
-            num_workers=3,
+            num_workers=2,
             batch_size=self.batch_size,
             collate_fn=self.pipeline,
         )
@@ -91,7 +91,7 @@ class CodonDataModule(pl.LightningDataModule):
         assert self.val_data is not None
         return DataLoader(
             self.val_data,
-            num_workers=3,
+            num_workers=2,
             batch_size=self.batch_size,
             collate_fn=self.pipeline,
         )

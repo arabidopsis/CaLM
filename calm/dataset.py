@@ -6,7 +6,7 @@ from pathlib import Path
 from torch.utils.data import Dataset
 from Bio import SeqIO
 from .sequence import Sequence, CodonSequence, AminoAcidSequence
-
+from .fasta import from_fastas
 
 class SequenceDataset(Dataset):
     """Common class for sequence datasets."""
@@ -31,7 +31,7 @@ class MultiSequenceDataset(Dataset):
     def __init__(
         self, fasta_files: SequenceType[str | Path], codon_sequence: bool = True
     ):
-        from .fasta import from_fastas
+
 
         self._fs = from_fastas(fasta_files)
         self.constructor = CodonSequence if codon_sequence else AminoAcidSequence

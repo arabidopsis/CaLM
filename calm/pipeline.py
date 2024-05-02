@@ -33,11 +33,6 @@ def _split_array(array: np.ndarray, chunks: list[int]) -> list[np.ndarray]:
     return arrays
 
 
-# PipelineInput = namedtuple("PipelineInput", ["sequence"])
-# PipelineOutput = namedtuple("PipelineOutput", ["input", "labels", "ground_truth"])
-# _PipelineData = namedtuple("_PipelineData", ["ground_truth", "sequence", "target_mask"])
-
-
 class PipelineInput(NamedTuple):
     sequences: list[Sequence]
 
@@ -144,24 +139,25 @@ class Pipeline:
         return data  # type: ignore
 
 
-class DataCollator(PipelineEntrypoint):
+class MaskAndChange(PipelineEntrypoint):
     """Class to process sequences and apply random masking. The output
-    of a call to DataCollator are strings of tokens, separated by spaces,
+    of a call to MaskAndChange are strings of tokens, separated by spaces,
     and arrays which are zero except where a token change has occurred."""
 
     def __init__(
         self,
         cfg: PipelineCfg,
-        alphabet: Alphabet,
+        coding_toks: list[str],
     ):
         self.cfg = cfg
-        self.alphabet = alphabet
+        self.coding_toks = coding_toks
 
     def __call__(self, input_: PipelineInput) -> PipelineData:
         output = PipelineData(ground_truth=[], sequence=[], target_mask=[])
 
         for seq in input_.sequences:
-            tokens, mask = self._mask_seq(seq.tokens)
+            tokens = seq.tokens  # this splits seq.seq
+            tokens, mask = self._mask_seq(tokens)
             output.target_mask.append(mask)
             output.sequence.append(" ".join(tokens))
             output.ground_truth.append(seq.seq)
@@ -188,7 +184,7 @@ class DataCollator(PipelineEntrypoint):
         for idx_mask in idxs_mask:
             tokens[idx_mask] = "<mask>"
         for idx_change in idxs_change:
-            tokens[idx_change] = np.random.choice(self.alphabet.coding_toks)
+            tokens[idx_change] = np.random.choice(self.coding_toks)
 
         # Generate masks
         mask = np.zeros(num_tokens)
@@ -201,9 +197,8 @@ class DataTrimmer(PipelineBlock):
     """Class to trim sequences. Returns sequences and masks that have
     been trimmed to the maximum number of positions of the model."""
 
-    def __init__(self, max_positions: int, alphabet: Alphabet):
+    def __init__(self, max_positions: int):
         self.max_positions = max_positions
-        self.alphabet = alphabet
 
     def __call__(self, input_: PipelineData) -> PipelineData:
         output = PipelineData(ground_truth=[], sequence=[], target_mask=[])
@@ -223,11 +218,11 @@ class DataTrimmer(PipelineBlock):
     ) -> tuple[str, str, np.ndarray]:
 
         original_tokens = original_seq.split()
-        masked_tokens = masked_seq.split()
         n_tokens = len(original_tokens)
         if n_tokens <= self.max_positions:
             return original_seq, masked_seq, mask
         else:
+            masked_tokens = masked_seq.split()
             start = np.random.randint(0, n_tokens - self.max_positions)
             end = start + self.max_positions
             new_original_seq = " ".join(original_tokens[start:end])
@@ -239,9 +234,8 @@ class DataTrimmer(PipelineBlock):
 class DataPadder(PipelineBlock):
     """Class to pad sequences."""
 
-    def __init__(self, max_positions: int, alphabet: Alphabet) -> None:
+    def __init__(self, max_positions: int) -> None:
         self.max_positions = max_positions
-        self.alphabet = alphabet
 
     def __call__(self, input_: PipelineData) -> PipelineData:
         output = PipelineData(ground_truth=[], sequence=[], target_mask=[])
@@ -283,7 +277,6 @@ class DataPreprocessor(PipelineEndpoint):
     """Class to transform tokens into PyTorch Tensors."""
 
     def __init__(self, alphabet: Alphabet):
-        self.alphabet = alphabet
         self.batch_converter = alphabet.get_batch_converter()
 
     def __call__(self, input_: PipelineData) -> PipelineOutput:
@@ -306,12 +299,19 @@ class DataPreprocessor(PipelineEndpoint):
 def standard_pipeline(cfg: PipelineCfg, alphabet: Alphabet) -> Pipeline:
     return Pipeline(
         [
-            DataCollator(
+            MaskAndChange(
                 cfg,
-                alphabet,
+                alphabet.coding_toks,  # for replacement tokens
             ),
-            DataTrimmer(cfg.max_positions, alphabet),
-            DataPadder(cfg.max_positions, alphabet),
-            DataPreprocessor(alphabet),
+            DataTrimmer(cfg.max_positions),
+            DataPadder(cfg.max_positions),
+            DataPreprocessor(alphabet),  # for batch_coverter
         ]
+    )
+
+
+def test_pipeline(max_positions: int = 100) -> Pipeline:
+    return standard_pipeline(
+        PipelineCfg(max_positions=max_positions),
+        Alphabet.from_architecture("CodonModel"),
     )
