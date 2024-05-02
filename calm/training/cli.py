@@ -57,10 +57,15 @@ def fasta(fasta_file: IO[str], out: IO[str], number: int, start: int) -> None:
     SeqIO.write(islice(SeqIO.parse(fasta_file, "fasta"), start, number), out, "fasta")
 
 
+
 @calm.command()
-@click.option('--max-depth', default=-1, help='see pytorch_lightning.utilities.model_summary.ModelSummary')
+@click.option(
+    "--max-depth",
+    default=-1,
+    help="see pytorch_lightning.utilities.model_summary.ModelSummary",
+)
 @click.argument("checkpoint", type=click.Path(dir_okay=False))
-def summary(checkpoint: str, max_depth:int) -> None:
+def summary(checkpoint: str, max_depth: int) -> None:
     """Summary of model from checkpoint"""
     from pytorch_lightning.utilities.model_summary import ModelSummary
     from .training import CodonModel

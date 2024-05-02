@@ -133,7 +133,10 @@ class CodonModel(pl.LightningModule):
 @dataclass
 class TrainingCfg(ArgparseMixin):
     name: str = "training-run"
-    ckpt_path: str | None = field(default=None, metadata=dict(type=optional(str)))
+    ckpt_path: str | None = field(
+        default=None,
+        metadata=dict(type=optional(str), help="load weights from checkpoint"),
+    )
     no_progress_bar: bool = False
 
 
@@ -176,8 +179,7 @@ def train() -> None:
         else str(Path(training_cfg.ckpt_path).expanduser())
     )
     if ckpt_path:
-        print("loading", ckpt_path)
-        # model.load_state_dict(torch.load(ckpt_path)["state_dict"])
+        print("loading checkpoint", ckpt_path)
         model = CodonModel.load_from_checkpoint(ckpt_path, args=args)
     else:
         model = CodonModel(args)
