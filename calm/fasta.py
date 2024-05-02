@@ -44,8 +44,7 @@ class RandomFasta(Sequence[Record]):
         f = [(h.start(), h.end()) for h in PREFIX.finditer(self.fasta)]
         end, start = zip(*f)
         end = end[1:] + (len(self.fasta),)
-        res = list(zip(start, end))
-        return res
+        return list(zip(start, end))
 
     def get_idx(self, idx: int) -> Record:
         s, e = self.pos[idx]

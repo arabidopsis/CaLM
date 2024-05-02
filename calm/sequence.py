@@ -1,6 +1,13 @@
 """Classes to deal with codon sequences."""
 
 import abc
+import re
+
+WHITE = re.compile(r"\W+", re.I | re.M)
+
+
+def remove_white(s: str) -> str:
+    return WHITE.sub("", s)
 
 
 def _split_into_codons(seq: str):
@@ -13,13 +20,12 @@ class Sequence(abc.ABC):
     """Abstract base class for sequence data."""
 
     def __init__(self, seq_: str):
-        seq = seq_.upper()
         _tokens = [
             "<cls>",
-            *self._sanitize(self.split(seq)),
+            *self._sanitize(self.split(remove_white(seq_.upper()))),
             "<eos>",
         ]
-        # self._tokens = self._sanitize(_tokens)
+        # self._tokens = _tokens
         self._seq = " ".join(_tokens)
 
     @property
@@ -61,11 +67,12 @@ class CodonSequence(Sequence):
     ['<cls>', 'AUG', 'GCG', 'CUA', 'AAG', 'CGG', 'AUC', '<eos>']
     """
 
-    def split(self, seq):
-        return _split_into_codons(seq.replace("T", "U").replace(" ", ""))
+    def split(self, seq: str) -> list[str]:
+        return _split_into_codons(seq.replace("T", "U"))
 
 
 class AminoAcidSequence(Sequence):
 
-    def split(self, seq):
+    def split(self, seq: str) -> list[str]:
+        """split on letters"""
         return list(seq)
