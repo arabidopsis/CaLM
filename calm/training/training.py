@@ -148,7 +148,7 @@ def init_args() -> tuple[argparse.Namespace, list[Path]]:
     parser = CodonModel.add_args(parser)
     parser = TrainingCfg.add_args(parser)
 
-    parser.add_argument("fasta_files", nargs="*")
+    parser.add_argument("fasta_files", nargs="*", help="Training Fasta files")
 
     args = parser.parse_args()
     training_data: list[str] = args.fasta_files
@@ -176,9 +176,9 @@ def train() -> None:
     ckpt_path = (
         None
         if training_cfg.ckpt_path is None
-        else str(Path(training_cfg.ckpt_path).expanduser())
+        else Path(training_cfg.ckpt_path).expanduser()
     )
-    if ckpt_path:
+    if ckpt_path is not None:
         print("loading checkpoint", ckpt_path)
         model = CodonModel.load_from_checkpoint(ckpt_path, args=args)
     else:

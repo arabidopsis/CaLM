@@ -10,7 +10,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn import Parameter
-from rotary_embedding_torch import RotaryEmbedding
+from rotary_embedding_torch import RotaryEmbedding  # type:ignore
 
 import uuid
 
