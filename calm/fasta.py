@@ -1,10 +1,10 @@
 import mmap
 import re
+import os
+import bisect
 from dataclasses import dataclass
-from pathlib import Path
 from collections.abc import Sequence
 from typing import Iterator, overload
-import bisect
 
 
 @dataclass
@@ -21,17 +21,32 @@ class Record:
 PREFIX = re.compile(b"(\n>|\r>|^>)", re.M)
 
 WHITE = re.compile(rb"\W+", re.I | re.M)
+EOL = re.compile(rb"\n|\r", re.I | re.M)
 
-def from_fastas(fasta_files: Sequence[str | Path]) -> Sequence[Record]:
+
+def remove_white(s: bytes) -> bytes:
+    return WHITE.sub(b"", s)
+
+
+def nnfastas(
+    fasta_files: Sequence[os.PathLike| str], encoding: str | None = None
+) -> Sequence[Record]:
+    if not fasta_files:
+        raise ValueError("no fasta files!")
     if len(fasta_files) == 1:
-        return RandomFasta(fasta_files[0])
-    return CollectionFasta(fasta_files)
+        return RandomFasta(fasta_files[0], encoding=encoding)
+    return CollectionFasta(fasta_files, encoding=encoding)
+
 
 class RandomFasta(Sequence[Record]):
     """Memory mapped fasta file."""
 
-    def __init__(self, fasta_file: str | Path):
-        self.fp = open(fasta_file, "rb")
+    ENCODING = "ascii"
+
+    def __init__(self, fasta_file: os.PathLike| str, encoding: str | None = None):
+
+        self.encoding = encoding or self.ENCODING
+        self.fp = open(fasta_file, "rb") # pylint: disable=consider-using-with
         self.fasta = mmap.mmap(self.fp.fileno(), 0, prot=mmap.PROT_READ)
         self.pos = self.find_pos()
 
@@ -48,15 +63,20 @@ class RandomFasta(Sequence[Record]):
 
     def get_idx(self, idx: int) -> Record:
         s, e = self.pos[idx]
-        b = self.fasta[s:e]
-        e = b.find(b"\n")
+        b = self.fasta[s:e] # mmap go to disk
+        m = EOL.search(b)
+        if not m:
+            raise ValueError(f"not a fasta file: {str(b)}")
+        e = m.start()
         desc = b[0:e]
         sid, _ = desc.split(b" ", maxsplit=1)
         seq = b[e + 1 :]
-        seq = WHITE.sub(b"", seq)
-
+        seq = remove_white(seq)
+        encoding = self.encoding
         return Record(
-            sid.decode("ascii"), desc.decode("ascii"), seq.upper().decode("ascii")
+            sid.decode(encoding),
+            desc.strip().decode(encoding),
+            seq.upper().decode(encoding),
         )
 
     def __len__(self) -> int:
@@ -77,9 +97,10 @@ class RandomFasta(Sequence[Record]):
 
 
 class CollectionFasta(Sequence[Record]):
+    """Multiple memory mapped fasta files"""
 
-    def __init__(self, fasta_files: Sequence[str | Path]):
-        self.fastas = [RandomFasta(f) for f in fasta_files]
+    def __init__(self, fasta_files: Sequence[os.PathLike | str], encoding: str | None = None):
+        self.fastas = [RandomFasta(f, encoding=encoding) for f in fasta_files]
         _cumsum = []
         cumsum = 0
         for f in self.fastas:
@@ -96,13 +117,8 @@ class CollectionFasta(Sequence[Record]):
         return idx - r, self.fastas[i]
 
     def _map_idxs(self, idxs: Sequence[int]) -> Iterator[tuple[int, RandomFasta]]:
-        cs = self._cumsum
         for idx in idxs:
-            i = bisect.bisect_right(cs, idx)
-            if i > len(cs):
-                raise IndexError("list out of range")
-            r = cs[i - 1] if i > 0 else 0
-            yield idx - r, self.fastas[i]
+            yield self._map_idx(idx)
 
     def __len__(self) -> int:
         return self._len

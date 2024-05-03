@@ -1,12 +1,13 @@
 """Common class for sequence datasets."""
 
+import os
 from typing import Sequence as SequenceType
 from typing import TypeVar, Generic
 from pathlib import Path
 from torch.utils.data import Dataset
 from Bio import SeqIO
 from .sequence import Sequence, CodonSequence, AminoAcidSequence
-from .fasta import from_fastas
+from .fasta import nnfastas
 
 class SequenceDataset(Dataset):
     """Common class for sequence datasets."""
@@ -29,11 +30,10 @@ class SequenceDataset(Dataset):
 
 class MultiSequenceDataset(Dataset):
     def __init__(
-        self, fasta_files: SequenceType[str | Path], codon_sequence: bool = True
+        self, fasta_files: SequenceType[str | os.PathLike], codon_sequence: bool = True
     ):
 
-
-        self._fs = from_fastas(fasta_files)
+        self._fs = nnfastas(fasta_files)
         self.constructor = CodonSequence if codon_sequence else AminoAcidSequence
 
     def __len__(self) -> int:
