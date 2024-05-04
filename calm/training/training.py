@@ -194,7 +194,7 @@ def train() -> None:
         model.model.alphabet,
         fasta_files=fasta_files,
         batch_size=codon_cfg.batch_size,
-        random_seed=codon_cfg.random_seed
+        random_seed=codon_cfg.random_seed,
     )
 
     # training

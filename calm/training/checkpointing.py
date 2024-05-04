@@ -10,7 +10,7 @@ class PeriodicCheckpoint(ModelCheckpoint):
         self.every = every
         self.dirpath = Path(dirpath)
 
-        if not  self.dirpath.exists():
+        if not self.dirpath.exists():
             self.dirpath.mkdir(exist_ok=True)
 
     def on_before_zero_grad(

@@ -68,7 +68,9 @@ def summary(checkpoint: str, max_depth: int) -> None:
     from pytorch_lightning.utilities.model_summary import ModelSummary
     from .training import CodonModel
 
-    model = CodonModel.load_from_checkpoint(checkpoint) # pylint: disable=no-value-for-parameter
+    model = CodonModel.load_from_checkpoint(
+        checkpoint
+    )  # pylint: disable=no-value-for-parameter
 
     click.echo(ModelSummary(model, max_depth=max_depth))
 

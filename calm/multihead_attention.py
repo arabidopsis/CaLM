@@ -14,7 +14,6 @@ from torch.nn import Parameter
 from rotary_embedding_torch import RotaryEmbedding  # type:ignore
 
 
-
 def utils_softmax(x, dim: int, onnx_trace: bool = False):
     if onnx_trace:
         return F.softmax(x.float(), dim=dim)

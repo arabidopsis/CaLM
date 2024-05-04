@@ -3,8 +3,10 @@
 import os
 from typing import Sequence as SequenceType
 from typing import TypeVar, Generic
+
 # from pathlib import Path
 from torch.utils.data import Dataset
+
 # from Bio import SeqIO
 from .sequence import Sequence, CodonSequence, AminoAcidSequence
 from .fasta import nnfastas

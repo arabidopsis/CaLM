@@ -90,4 +90,3 @@ class CaLM:
     def tokenize(self, seq: CodonSequence) -> torch.Tensor:
         assert isinstance(seq, CodonSequence), "seq must be CodonSequence"
         return self.bc.from_seq(seq.seq)
-

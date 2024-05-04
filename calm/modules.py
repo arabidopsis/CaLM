@@ -206,7 +206,7 @@ except ImportError:
 
 
 class SinusoidalPositionalEmbedding(nn.Module):
-    def __init__(self, embed_dim:int, padding_idx:int, learned:bool=False):
+    def __init__(self, embed_dim: int, padding_idx: int, learned: bool = False):
         super().__init__()
         self.embed_dim = embed_dim
         self.padding_idx = padding_idx
@@ -262,7 +262,7 @@ class ContactPredictionHead(nn.Module):
         prepend_bos: bool,
         append_eos: bool,
         bias=True,
-        eos_idx: int|None = None,
+        eos_idx: int | None = None,
     ):
         super().__init__()
         self.in_features = in_features

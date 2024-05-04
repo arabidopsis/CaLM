@@ -23,7 +23,6 @@ class TrainedModel:
     def tokenize(self, seq: Sequence) -> torch.Tensor:
         return self.batch_converter.from_seq(seq.seq)
 
-
     def to_tensor(self, seq: str) -> torch.Tensor:
         model = self.model
         repr_layer = model.cfg.num_layers
