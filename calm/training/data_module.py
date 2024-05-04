@@ -10,7 +10,7 @@ import pytorch_lightning as pl
 # from sklearn.model_selection import train_test_split  # type: ignore
 
 from ..alphabet import Alphabet
-from ..dataset import MultiSequenceDataset, LazyDataset
+from ..dataset import MultiSequenceDataset
 from ..pipeline import (
     standard_pipeline,
     PipelineCfg,
@@ -37,7 +37,7 @@ class CodonDataModule(pl.LightningDataModule):
 
     def __init__(
         self,
-        args: CondonDataModuleCfg,
+        cfg: CondonDataModuleCfg,
         alphabet: Alphabet,
         *,
         fasta_files: list[Path],
@@ -50,21 +50,8 @@ class CodonDataModule(pl.LightningDataModule):
         self.test_size = test_size
         self.batch_size = batch_size
         self.random_seed = random_seed
-        # self.pipeline = Pipeline(
-        #     [
-        #         DataCollator(
-        #             args.mask_proportion,
-        #             args.mask_percent,
-        #             args.leave_percent,
-        #             alphabet,
-        #         ),
-        #         DataTrimmer(max_positions, alphabet),
-        #         DataPadder(max_positions, alphabet),
-        #         DataPreprocessor(alphabet),
-        #     ]
-        # )
 
-        self.pipeline = standard_pipeline(args, alphabet=alphabet)
+        self.pipeline = standard_pipeline(cfg, alphabet=alphabet)
 
         self.train_data: Dataset | None = None
         self.val_data: Dataset | None = None
@@ -75,8 +62,9 @@ class CodonDataModule(pl.LightningDataModule):
         generator = torch.Generator()
         if self.random_seed != -1:
             generator = generator.manual_seed(self.random_seed)
-        train_idx, val_idx = random_split(
-            range(len(dataset)),
+
+        self.train_data, self.val_data = random_split(
+            dataset,
             [1.0 - self.test_size, self.test_size],
             generator=generator,
         )
@@ -86,8 +74,6 @@ class CodonDataModule(pl.LightningDataModule):
         #     shuffle=True,
         #     random_state=self.random_seed,
         # )
-        self.train_data = LazyDataset(dataset, list(train_idx))
-        self.val_data = LazyDataset(dataset, list(val_idx))
 
     def train_dataloader(self) -> DataLoader:
         assert self.train_data is not None

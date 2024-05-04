@@ -74,9 +74,9 @@ def summary(checkpoint: str, max_depth: int) -> None:
     click.echo(ModelSummary(model, max_depth=max_depth))
 
 
-@calm.command()
+@calm.command(name="rna-ok")
 @click.argument("fasta_files", type=click.Path(dir_okay=False), nargs=-1)
-def rna_ok(fasta_files: tuple[str, ...]) -> None:
+def rna_ok_cmd(fasta_files: tuple[str, ...]) -> None:
     from ..sequence import rna_ok
     from ..fasta import nnfastas
 
@@ -87,7 +87,7 @@ def rna_ok(fasta_files: tuple[str, ...]) -> None:
         if msg:
             nbad += 1
             click.secho(f"{rec.id}: {msg}", fg="red")
-    click.secho(f"{nbad}/{len(fasta)} bad", fg="red" if nbad else "green")
+    click.secho(f"{nbad}/{len(fastaf)} bad", fg="red" if nbad else "green")
 
 
 if __name__ == "__main__":

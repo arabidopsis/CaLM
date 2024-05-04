@@ -1,5 +1,6 @@
 """PyTorch Lightning module for standard training."""
 
+import os
 import math
 import argparse
 from pathlib import Path
@@ -181,7 +182,11 @@ def train() -> None:
     )
     if ckpt_path is not None:
         print("loading checkpoint", ckpt_path)
-        model = CodonModel.load_from_checkpoint(ckpt_path, args=args)
+        model = (
+            CodonModel.load_from_checkpoint(  # pylint: disable=no-value-for-parameter
+                ckpt_path, args=args
+            )
+        )
     else:
         model = CodonModel(args)
     assert model.model.max_positions == dm_cfg.max_positions
@@ -203,6 +208,7 @@ def train() -> None:
     # logger = CSVLogger("logs", name=name)
     # pip install tensorboard
     logger = TensorBoardLogger(save_dir="logs", name=name)
+    fast_dev_run = True if os.environ.get("DEV_RUN", "0") == "1" else False
     trainer = pl.Trainer(
         num_nodes=1,
         precision="bf16-mixed",
@@ -212,7 +218,7 @@ def train() -> None:
         # val_check_interval=100*codon_cfg.accumulate_gradients,
         # accumulate_grad_batches=codon_cfg.accumulate_gradients,
         # limit_val_batches=1.0,
-        # fast_dev_run=True,
+        fast_dev_run=fast_dev_run,
         accelerator="auto",
         enable_progress_bar=not training_cfg.no_progress_bar,
         # max_time="00:00:01:00",
