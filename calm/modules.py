@@ -4,7 +4,7 @@ This code has been modified from the original implementation
 by Facebook Research, describing its ESM-1b paper."""
 
 import math
-
+from typing import Sequence
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -147,7 +147,7 @@ class LearnedPositionalEmbedding(nn.Embedding):
 class RobertaLMHead(nn.Module):
     """Head for masked language modeling."""
 
-    def __init__(self, embed_dim, output_dim, weight):
+    def __init__(self, embed_dim: int, output_dim: int, weight: torch.Tensor):
         super().__init__()
         self.dense = nn.Linear(embed_dim, embed_dim)
         self.layer_norm = ESM1bLayerNorm(embed_dim)
@@ -164,7 +164,9 @@ class RobertaLMHead(nn.Module):
 
 
 class ESM1LayerNorm(nn.Module):
-    def __init__(self, hidden_size, eps=1e-12, affine=True):
+    def __init__(
+        self, hidden_size: int | Sequence[int], eps: float = 1e-12, affine: bool = True
+    ):
         """Construct a layernorm layer in the TF style (eps inside the sqrt)."""
         super().__init__()
         self.hidden_size = (
@@ -261,7 +263,7 @@ class ContactPredictionHead(nn.Module):
         in_features: int,
         prepend_bos: bool,
         append_eos: bool,
-        bias=True,
+        bias: bool = True,
         eos_idx: int | None = None,
     ):
         super().__init__()

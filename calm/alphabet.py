@@ -214,7 +214,10 @@ class Alphabet:
         return tokenized_text
 
     def encode(self, text: str) -> list[int]:
-        return [self.tok_to_idx[tok] for tok in self.tokenize(text)]
+        return self.tokens2id(self.tokenize(text))
+
+    def tokens2id(self, tokens: list[str]) -> list[int]:
+        return [self.tok_to_idx[tok] for tok in tokens]
 
     def tokens_ok(self, tokens: list[str]) -> bool:
         return not bool(set(tokens) - self.unique_no_split_tokens)

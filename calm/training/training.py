@@ -212,6 +212,7 @@ def train() -> None:
         # val_check_interval=100*codon_cfg.accumulate_gradients,
         # accumulate_grad_batches=codon_cfg.accumulate_gradients,
         # limit_val_batches=1.0,
+        # fast_dev_run=True,
         accelerator="auto",
         enable_progress_bar=not training_cfg.no_progress_bar,
         # max_time="00:00:01:00",

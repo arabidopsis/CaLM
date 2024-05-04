@@ -68,11 +68,26 @@ def summary(checkpoint: str, max_depth: int) -> None:
     from pytorch_lightning.utilities.model_summary import ModelSummary
     from .training import CodonModel
 
-    model = CodonModel.load_from_checkpoint(
+    model = CodonModel.load_from_checkpoint(  # pylint: disable=no-value-for-parameter
         checkpoint
-    )  # pylint: disable=no-value-for-parameter
-
+    )
     click.echo(ModelSummary(model, max_depth=max_depth))
+
+
+@calm.command()
+@click.argument("fasta_files", type=click.Path(dir_okay=False), nargs=-1)
+def rna_ok(fasta_files: tuple[str, ...]) -> None:
+    from ..sequence import rna_ok
+    from ..fasta import nnfastas
+
+    nbad = 0
+    fastaf = nnfastas(fasta_files)
+    for rec in fastaf:
+        msg = rna_ok(rec.seq)
+        if msg:
+            nbad += 1
+            click.secho(f"{rec.id}: {msg}", fg="red")
+    click.secho(f"{nbad}/{len(fasta)} bad", fg="red" if nbad else "green")
 
 
 if __name__ == "__main__":

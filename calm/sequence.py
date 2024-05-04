@@ -76,3 +76,27 @@ class AminoAcidSequence(Sequence):
     def split(self, seq: str) -> list[str]:
         """split on letters"""
         return list(seq)
+
+
+def split_into_codons(seq: str) -> list[str]:
+    """Yield successive 3-letter chunks of a string/sequence."""
+    return list(_split_into_codons(seq))
+
+
+def rna_ok(seq: str) -> str | None:
+    stop = {"UGA", "UAG", "UAA"}
+    s = seq.upper()
+    msg = []
+    if not set(s).issubset({"A", "U", "C", "G", "T"}):
+        msg.append("non AUCGT letters in sequence")
+    if not len(s) % 3 == 0:
+        msg.append("not a multiple of 3")
+    if not seq[:3] == "AUG":
+        msg.append("no start codon")
+    if not seq[-3:] in stop:
+        msg.append("no stop codon")
+    codons = split_into_codons(s)
+    coding_positions = set(codons[:-1])
+    if stop & coding_positions:
+        msg.append("stop codons found in interior")
+    return None if not msg else ", ".join(msg)
