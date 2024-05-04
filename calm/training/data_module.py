@@ -3,9 +3,11 @@
 from dataclasses import dataclass
 from argparse import Namespace, ArgumentParser
 from pathlib import Path
-from torch.utils.data import Dataset, DataLoader
+import torch
+from torch.utils.data import Dataset, DataLoader, random_split
 import pytorch_lightning as pl
-from sklearn.model_selection import train_test_split  # type: ignore
+
+# from sklearn.model_selection import train_test_split  # type: ignore
 
 from ..alphabet import Alphabet
 from ..dataset import MultiSequenceDataset, LazyDataset
@@ -40,7 +42,7 @@ class CodonDataModule(pl.LightningDataModule):
         *,
         fasta_files: list[Path],
         batch_size: int,
-        random_seed: int = 42,
+        random_seed: int = -1,
         test_size: float = 0.01,
     ):
         super().__init__()
@@ -69,14 +71,23 @@ class CodonDataModule(pl.LightningDataModule):
 
     def setup(self, stage: str | None = None) -> None:
         dataset = MultiSequenceDataset(self.fasta_files, codon_sequence=True)
-        train_idx, val_idx = train_test_split(
+
+        generator = torch.Generator()
+        if self.random_seed != -1:
+            generator = generator.manual_seed(self.random_seed)
+        train_idx, val_idx = random_split(
             range(len(dataset)),
-            test_size=self.test_size,
-            shuffle=True,
-            random_state=self.random_seed,
+            [1.0 - self.test_size, self.test_size],
+            generator=generator,
         )
-        self.train_data = LazyDataset(dataset, train_idx)
-        self.val_data = LazyDataset(dataset, val_idx)
+        # train_idx, val_idx = train_test_split(
+        #     range(len(dataset)),
+        #     test_size=self.test_size,
+        #     shuffle=True,
+        #     random_state=self.random_seed,
+        # )
+        self.train_data = LazyDataset(dataset, list(train_idx))
+        self.val_data = LazyDataset(dataset, list(val_idx))
 
     def train_dataloader(self) -> DataLoader:
         assert self.train_data is not None

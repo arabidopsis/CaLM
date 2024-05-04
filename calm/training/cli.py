@@ -13,7 +13,7 @@ def calm():
 @click.argument("fasta_file", type=click.Path(dir_okay=False))
 def to_tensor(weights_file: str, fasta_file: str, is_torch: bool) -> None:
     """Convert cDNA fasta sequences into CaLM Tensors"""
-    from Bio import SeqIO
+    from ..fasta import RandomFasta
     from .pretrained import TrainedModel, BareModel
 
     c: TrainedModel
@@ -21,11 +21,10 @@ def to_tensor(weights_file: str, fasta_file: str, is_torch: bool) -> None:
         c = BareModel(weights_file)
     else:
         c = TrainedModel(weights_file)
-    with open(fasta_file, "rt", encoding="ascii") as fp:
-        for rec in SeqIO.parse(fp, "fasta"):
-            r = c.to_tensor(rec.seq)
-            t = r.mean(axis=1)  # type: ignore
-            print(rec.id, t)
+    for rec in RandomFasta(fasta_file):
+        r = c.to_tensor(rec.seq)
+        t = r.mean(axis=1)  # type: ignore
+        print(rec.id, t)
 
 
 @calm.command()
@@ -57,7 +56,6 @@ def fasta(fasta_file: IO[str], out: IO[str], number: int, start: int) -> None:
     SeqIO.write(islice(SeqIO.parse(fasta_file, "fasta"), start, number), out, "fasta")
 
 
-
 @calm.command()
 @click.option(
     "--max-depth",
@@ -70,7 +68,7 @@ def summary(checkpoint: str, max_depth: int) -> None:
     from pytorch_lightning.utilities.model_summary import ModelSummary
     from .training import CodonModel
 
-    model = CodonModel.load_from_checkpoint(checkpoint)
+    model = CodonModel.load_from_checkpoint(checkpoint) # pylint: disable=no-value-for-parameter
 
     click.echo(ModelSummary(model, max_depth=max_depth))
 

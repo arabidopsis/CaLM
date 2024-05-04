@@ -56,4 +56,4 @@ class ArgparseMixin:
 
     @classmethod
     def create(cls, ns: argparse.Namespace) -> Self:
-        return cls(**{f.name: getattr(ns, f.name) for f in fields(cls)})
+        return cls(**{f.name: getattr(ns, f.name) for f in fields(cls) if hasattr(ns, f.name)})

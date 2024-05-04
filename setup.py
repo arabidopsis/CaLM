@@ -19,7 +19,7 @@ setup(
         'requests',
         'torch>=1.6',
         'biopython',
-        'einops',
+        # 'einops',
         'rotary_embedding_torch'
     ],
 )

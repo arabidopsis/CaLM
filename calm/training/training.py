@@ -28,6 +28,7 @@ class CodonModelCfg(ArgparseMixin):
     learning_rate: float = 4e-4
     accumulate_gradients: int = 40
     num_steps: int = 121000
+    random_seed: int = -1
 
 
 class CodonModel(pl.LightningModule):
@@ -193,6 +194,7 @@ def train() -> None:
         model.model.alphabet,
         fasta_files=fasta_files,
         batch_size=codon_cfg.batch_size,
+        random_seed=codon_cfg.random_seed
     )
 
     # training
