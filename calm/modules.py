@@ -4,7 +4,6 @@ This code has been modified from the original implementation
 by Facebook Research, describing its ESM-1b paper."""
 
 import math
-from typing import Optional
 
 import torch
 import torch.nn as nn
@@ -263,7 +262,7 @@ class ContactPredictionHead(nn.Module):
         prepend_bos: bool,
         append_eos: bool,
         bias=True,
-        eos_idx: Optional[int] = None,
+        eos_idx: int|None = None,
     ):
         super().__init__()
         self.in_features = in_features

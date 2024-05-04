@@ -6,7 +6,7 @@ by Facebook Research, describing its ESM-1b paper."""
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass, field
 import torch
-import torch.nn as nn
+from torch import nn
 
 from .modules import (
     TransformerLayer,

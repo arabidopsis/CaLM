@@ -20,6 +20,7 @@ setup(
         'torch>=1.6',
         'biopython',
         # 'einops',
-        'rotary_embedding_torch'
+        'rotary_embedding_torch',
+        'typing_extensions'
     ],
 )

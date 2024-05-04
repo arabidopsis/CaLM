@@ -4,7 +4,8 @@ This code has been modified from the original implementation
 by Facebook Research, describing its ESM-1b paper."""
 
 import math
-from typing import Dict, Optional, Tuple
+from typing import Optional
+import uuid
 
 import torch
 import torch.nn.functional as F
@@ -12,7 +13,6 @@ from torch import Tensor, nn
 from torch.nn import Parameter
 from rotary_embedding_torch import RotaryEmbedding  # type:ignore
 
-import uuid
 
 
 def utils_softmax(x, dim: int, onnx_trace: bool = False):
@@ -35,9 +35,9 @@ class FairseqIncrementalState(object):
 
     def get_incremental_state(
         self,
-        incremental_state: Optional[Dict[str, Dict[str, Optional[Tensor]]]],
+        incremental_state: Optional[dict[str, dict[str, Optional[Tensor]]]],
         key: str,
-    ) -> Optional[Dict[str, Optional[Tensor]]]:
+    ) -> Optional[dict[str, Optional[Tensor]]]:
         """Helper for getting incremental state for an nn.Module."""
         full_key = self._get_full_incremental_state_key(key)
         if incremental_state is None or full_key not in incremental_state:
@@ -46,10 +46,10 @@ class FairseqIncrementalState(object):
 
     def set_incremental_state(
         self,
-        incremental_state: Optional[Dict[str, Dict[str, Optional[Tensor]]]],
+        incremental_state: Optional[dict[str, dict[str, Optional[Tensor]]]],
         key: str,
-        value: Dict[str, Optional[Tensor]],
-    ) -> Optional[Dict[str, Dict[str, Optional[Tensor]]]]:
+        value: dict[str, Optional[Tensor]],
+    ) -> Optional[dict[str, dict[str, Optional[Tensor]]]]:
         """Helper for setting incremental state for an nn.Module."""
         if incremental_state is not None:
             full_key = self._get_full_incremental_state_key(key)
@@ -164,13 +164,13 @@ class MultiheadAttention(nn.Module):
         key: Optional[Tensor],
         value: Optional[Tensor],
         key_padding_mask: Optional[Tensor] = None,
-        incremental_state: Optional[Dict[str, Dict[str, Optional[Tensor]]]] = None,
+        incremental_state: Optional[dict[str, dict[str, Optional[Tensor]]]] = None,
         need_weights: bool = True,
         static_kv: bool = False,
         attn_mask: Optional[Tensor] = None,
         before_softmax: bool = False,
         need_head_weights: bool = False,
-    ) -> Tuple[Tensor, Optional[Tensor]]:
+    ) -> tuple[Tensor, Optional[Tensor]]:
         """Input shape: Time x Batch x Channel
 
         Args:
@@ -468,7 +468,7 @@ class MultiheadAttention(nn.Module):
     @torch.jit.export
     def reorder_incremental_state(
         self,
-        incremental_state: Dict[str, Dict[str, Optional[Tensor]]],
+        incremental_state: dict[str, dict[str, Optional[Tensor]]],
         new_order: Tensor,
     ):
         """Reorder buffered internal state (for incremental generation)."""
@@ -486,19 +486,19 @@ class MultiheadAttention(nn.Module):
         return incremental_state
 
     def _get_input_buffer(
-        self, incremental_state: Optional[Dict[str, Dict[str, Optional[Tensor]]]]
-    ) -> Dict[str, Optional[Tensor]]:
+        self, incremental_state: Optional[dict[str, dict[str, Optional[Tensor]]]]
+    ) -> dict[str, Optional[Tensor]]:
         result = self.get_incremental_state(incremental_state, "attn_state")
         if result is not None:
             return result
         else:
-            empty_result: Dict[str, Optional[Tensor]] = {}
+            empty_result: dict[str, Optional[Tensor]] = {}
             return empty_result
 
     def _set_input_buffer(
         self,
-        incremental_state: Dict[str, Dict[str, Optional[Tensor]]],
-        buffer: Dict[str, Optional[Tensor]],
+        incremental_state: dict[str, dict[str, Optional[Tensor]]],
+        buffer: dict[str, Optional[Tensor]],
     ):
         return self.set_incremental_state(incremental_state, "attn_state", buffer)
 
