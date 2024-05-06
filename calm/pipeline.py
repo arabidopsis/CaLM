@@ -289,7 +289,7 @@ class DataPreprocessor(PipelineEndpoint):
         )
 
     def _compute_input(self, seq_list: list[str]) -> torch.Tensor:
-        _, _, input_ = self.batch_converter([("", seq) for seq in seq_list])
+        input_ = self.batch_converter.from_seqs(seq_list)
         return input_.to(dtype=torch.int32)
 
     def _compute_mask(self, mask_list: list[np.ndarray]) -> torch.Tensor:

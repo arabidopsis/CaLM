@@ -1,6 +1,6 @@
 import argparse
 
-from dataclasses import dataclass, fields
+from dataclasses import dataclass, fields, asdict
 from typing_extensions import Self
 
 
@@ -59,3 +59,8 @@ class ArgparseMixin:
         return cls(
             **{f.name: getattr(ns, f.name) for f in fields(cls) if hasattr(ns, f.name)}
         )
+
+    def to_namespace(self, **kwargs) -> argparse.Namespace:
+        d = asdict(self)
+        d.update(kwargs)
+        return argparse.Namespace(**d)

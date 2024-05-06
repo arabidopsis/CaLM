@@ -5,6 +5,7 @@ by Facebook Research, describing its ESM-1b paper."""
 
 from argparse import ArgumentParser, Namespace
 from dataclasses import dataclass, field
+from typing_extensions import override
 import torch
 from torch import nn
 
@@ -21,7 +22,9 @@ from .utils import ArgparseMixin
 
 @dataclass
 class ProteinBertModelCfg(ArgparseMixin):
-    num_layers: int = field(default=12, metadata=dict(help="number of layers"))
+    num_layers: int = field(
+        default=12, metadata=dict(help="number of transformer layers")
+    )
     embed_dim: int = field(default=768, metadata=dict(help="embedding dimension"))
     attention_dropout: float = field(
         default=0.0, metadata=dict(help="dropout on attention")
@@ -45,6 +48,10 @@ class ProteinBertModelCfg(ArgparseMixin):
     emb_layer_norm_before: bool = False
     token_dropout: bool = False
     alphabet: str = "CodonModel"
+
+    @override
+    def to_namespace(self, max_positions: int = 1024, **_kwargs):
+        return super().to_namespace(max_positions=max_positions)
 
 
 class ProteinBertModel(nn.Module):
@@ -81,16 +88,16 @@ class ProteinBertModel(nn.Module):
 
     def _init_submodules_common(self):
         self.embed_tokens = nn.Embedding(
-            self.alphabet_size,
-            self.cfg.embed_dim,
+            self.alphabet_size,  # 69 for RNA
+            self.cfg.embed_dim,  # 768
             padding_idx=self.alphabet.padding_idx,
         )
         self.layers = nn.ModuleList(
             [
                 TransformerLayer(
                     self.cfg.embed_dim,
-                    self.cfg.ffn_embed_dim,
-                    self.cfg.attention_heads,
+                    self.cfg.ffn_embed_dim, # 4*768
+                    self.cfg.attention_heads, # 12
                     attention_dropout=self.cfg.attention_dropout,
                     add_bias_kv=(self.model_version != "ESM-1b"),
                     use_esm1b_layer_norm=(self.model_version == "ESM-1b"),
@@ -126,7 +133,7 @@ class ProteinBertModel(nn.Module):
         if repr_layers is None:
             repr_layers = []
 
-        assert tokens.ndim == 2
+        assert tokens.ndim == 2  # batch_size x  max_positions
         padding_mask = tokens.eq(self.alphabet.padding_idx)  # B, T
 
         x = self.embed_scale * self.embed_tokens(tokens)
@@ -198,8 +205,8 @@ class ProteinBertModel(nn.Module):
                 attentions = attentions * attention_mask[:, None, None, :, :]
             result["attentions"] = attentions
 
-        return result
+        return result # batch x max_positions x alphabet_size
 
     @property
-    def num_layers(self):
+    def num_layers(self) -> int:
         return self.cfg.num_layers

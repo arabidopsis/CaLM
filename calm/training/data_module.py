@@ -81,6 +81,7 @@ class CodonDataModule(pl.LightningDataModule):
             self.train_data,
             num_workers=2,
             batch_size=self.batch_size,
+            shuffle=True,
             collate_fn=self.pipeline,
         )
 

@@ -217,7 +217,7 @@ class Alphabet:
         return self.tokens2id(self.tokenize(text))
 
     def tokens2id(self, tokens: list[str]) -> list[int]:
-        return [self.tok_to_idx[tok] for tok in tokens]
+        return [self.get_idx(tok) for tok in tokens]
 
     def tokens_ok(self, tokens: list[str]) -> bool:
         return not bool(set(tokens) - self.unique_no_split_tokens)
@@ -233,6 +233,10 @@ class BatchConverter:
 
     def from_seq(self, seq: str) -> torch.Tensor:
         _, _, tokens = self([("", seq)])
+        return tokens
+
+    def from_seqs(self, seqs: Sequence[str]) -> torch.Tensor:
+        _, _, tokens = self([("", seq) for seq in seqs])
         return tokens
 
     def __call__(
