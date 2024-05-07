@@ -22,6 +22,7 @@ from ..utils import ArgparseMixin
 class CondonDataModuleCfg(PipelineCfg, ArgparseMixin):
     num_data_workers: int = 2
 
+
 class CodonDataModule(pl.LightningDataModule):
     """PyTorch Lightning DataModule for manipulating FASTA files
     containing sequences of codons."""

@@ -140,7 +140,7 @@ class CodonModel(pl.LightningModule):
         self.log_dict(
             {"validation_loss": loss, "validation_accuracy": acc},
             batch_size=self.cfg.batch_size,
-            sync_dist=True
+            sync_dist=True,
         )
         return loss
 
@@ -163,6 +163,7 @@ class TrainingCfg(ArgparseMixin):
     no_progress_bar: bool = False
     # see https://lightning.ai/docs/pytorch/stable/clouds/cluster_advanced.html
     # SLURM
+    is_slurm: bool = False
     nodes: int = 1
     ntasks_per_node: int = 1
 
@@ -191,10 +192,12 @@ def init_args() -> tuple[argparse.Namespace, list[Path]]:
 
 
 def slurm_env(cfg: TrainingCfg) -> TrainingCfg:
-
+    is_slurm = "SLURM_NNODES" in os.environ
     nodes = os.environ.get("SLURM_NNODES", cfg.nodes)
     ntasks_per_node = os.environ.get("SLURM_TASKS_PER_NODE", cfg.ntasks_per_node)
-    return replace(cfg, nodes=int(nodes), ntasks_per_node=int(ntasks_per_node))
+    return replace(
+        cfg, nodes=int(nodes), ntasks_per_node=int(ntasks_per_node), is_slurm=is_slurm
+    )
 
 
 def train() -> None:
@@ -253,7 +256,7 @@ def train() -> None:
         # limit_val_batches=1.0,
         fast_dev_run=fast_dev_run,
         accelerator="auto",
-        enable_progress_bar=not training_cfg.no_progress_bar,
+        enable_progress_bar=(not training_cfg.no_progress_bar),
         # max_time="00:00:01:00",
         callbacks=[
             PeriodicCheckpoint(1000, name),
