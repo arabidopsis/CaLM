@@ -154,8 +154,8 @@ class MaskAndChange(PipelineEntrypoint):
         num_to_change = num_changed_tokens - num_to_mask - num_to_leave
 
         # Apply masking
-        idxs: np.ndarray[int] = np.random.choice(
-            np.arange(1, num_tokens - 1),  # avoid <cls> and <eos>
+        idxs = np.random.choice(
+            np.arange(1, num_tokens - 1, dtype=np.int32),  # avoid <cls> and <eos>
             size=num_changed_tokens,
             replace=False,
         )

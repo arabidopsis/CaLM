@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=61.2", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+
+requires-python = ">= 3.8"
+name = "CaLM"
+version = "0.1.1"
+maintainers = [
+    { name = "Carlos Outeiral", email = "carlos.outeiral@stats.ox.ac.uk" },
+]
+description = "CaLM: the Codon adaptation Language Model"
+readme = "README.md"
+license = { text = "BSD 3-clause license" }
+dependencies = [
+    'torch>=1.6',
+    'numpy',
+    'requests',
+    # 'biopython',
+    # 'einops',
+    'rotary_embedding_torch',
+    'typing_extensions',
+]
+[project.optional-dependencies]
+training = ["pytorch-lightning"]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["calm*"]
+exclude = ["tests*"]
+# namespaces = false
