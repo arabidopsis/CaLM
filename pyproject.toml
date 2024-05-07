@@ -24,6 +24,7 @@ dependencies = [
 ]
 [project.optional-dependencies]
 training = ["pytorch-lightning"]
+testing = ['biopython']
 
 [tool.setuptools]
 include-package-data = true

@@ -45,6 +45,10 @@ class MultiSequenceDataset(Dataset):
         r = self._fs[idx]
         return self.constructor(r.seq)
 
+    def __getitems__(self, idxs: list[int]) -> list[Sequence]:
+        c = self.constructor
+        return [c(r.seq) for r in self._fs[idxs]]  # type: ignore
+
 
 T = TypeVar("T")
 

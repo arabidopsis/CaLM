@@ -153,6 +153,10 @@ class MaskAndChange(PipelineEntrypoint):
         num_to_leave = int(num_changed_tokens * self.cfg.leave_percent)
         num_to_change = num_changed_tokens - num_to_mask - num_to_leave
 
+        sizes = [num_to_mask, num_to_leave, num_to_change]
+        if 0 in sizes:
+            print("problem with sizes", num_changed_tokens, sizes, tokens_)
+
         # Apply masking
         idxs = np.random.choice(
             np.arange(1, num_tokens - 1, dtype=np.int32),  # avoid <cls> and <eos>
@@ -164,7 +168,7 @@ class MaskAndChange(PipelineEntrypoint):
         # )
 
         idxs_mask, _, idxs_change = random_split(
-            cast(Dataset[int], idxs), [num_to_mask, num_to_leave, num_to_change]
+            cast(Dataset[int], idxs), sizes
         )
 
         for idx_mask in iter(idxs_mask):

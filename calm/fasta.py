@@ -5,6 +5,7 @@ import bisect
 from dataclasses import dataclass
 from collections.abc import Sequence
 from typing import Iterator, overload
+import numpy as np
 
 
 @dataclass
@@ -55,11 +56,12 @@ class RandomFasta(Sequence[Record]):
             self.fp.close()
             self.fp = None
 
-    def find_pos(self) -> list[tuple[int, int]]:
+    def find_pos(self) -> np.ndarray:
         f = [(h.start(), h.end()) for h in PREFIX.finditer(self.fasta)]
         end, start = zip(*f)
         end = end[1:] + (len(self.fasta),)
-        return list(zip(start, end))
+        a: list[list[int]] = [[s, e] for s, e in zip(start, end)]
+        return np.ndarray(a) # type: ignore
 
     def get_idx(self, idx: int) -> Record:
         s, e = self.pos[idx]
