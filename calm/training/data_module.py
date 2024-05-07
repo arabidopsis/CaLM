@@ -20,8 +20,7 @@ from ..utils import ArgparseMixin
 
 @dataclass
 class CondonDataModuleCfg(PipelineCfg, ArgparseMixin):
-    pass
-
+    num_data_workers: int = 2
 
 class CodonDataModule(pl.LightningDataModule):
     """PyTorch Lightning DataModule for manipulating FASTA files
@@ -50,6 +49,7 @@ class CodonDataModule(pl.LightningDataModule):
         self.test_size = test_size
         self.batch_size = batch_size
         self.random_seed = random_seed
+        self.num_workers = cfg.num_data_workers
 
         self.pipeline = standard_pipeline(cfg, alphabet=alphabet)
 
@@ -79,7 +79,7 @@ class CodonDataModule(pl.LightningDataModule):
         assert self.train_data is not None
         return DataLoader(
             self.train_data,
-            num_workers=2,
+            num_workers=self.num_workers,
             batch_size=self.batch_size,
             shuffle=True,
             collate_fn=self.pipeline,
@@ -89,7 +89,7 @@ class CodonDataModule(pl.LightningDataModule):
         assert self.val_data is not None
         return DataLoader(
             self.val_data,
-            num_workers=2,
+            num_workers=self.num_workers,
             batch_size=self.batch_size,
             collate_fn=self.pipeline,
         )

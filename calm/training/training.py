@@ -138,8 +138,9 @@ class CodonModel(pl.LightningModule):
         )
         acc = self._accuracy(likelihoods, labels)
         self.log_dict(
-            {"train_loss": loss, "train_accuracy": acc},
+            {"validation_loss": loss, "validation_accuracy": acc},
             batch_size=self.cfg.batch_size,
+            sync_dist=True
         )
         return loss
 
