@@ -239,13 +239,26 @@ class BatchConverter:
         _, _, tokens = self([("", seq) for seq in seqs])
         return tokens
 
+    def from_tokens(self, tokens: list[list[str]]) -> torch.Tensor:
+        return self._tokens_to_tensor(
+            [self.alphabet.tokens2id(seq_str) for seq_str in tokens]
+        )
+
     def __call__(
         self, raw_batch: Sequence[tuple[str, str]]
     ) -> tuple[list[str], list[str], torch.Tensor]:
         # RoBERTa uses an eos token, while ESM-1 does not.
-        batch_size = len(raw_batch)
-        batch_labels, seq_str_list = zip(*raw_batch)
-        seq_encoded_list = [self.alphabet.encode(seq_str) for seq_str in seq_str_list]
+        strs: list[str]
+        labels: list[str]
+        labels, strs = map(list[str], zip(*raw_batch))
+
+        seq_encoded_list = [self.alphabet.encode(seq_str) for seq_str in strs]
+        tokens = self._tokens_to_tensor(seq_encoded_list)
+
+        return labels, strs, tokens
+
+    def _tokens_to_tensor(self, seq_encoded_list: list[list[int]]) -> torch.Tensor:
+        batch_size = len(seq_encoded_list)
         max_len = len(max(seq_encoded_list, key=len))
         tokens = torch.empty(
             (
@@ -257,14 +270,8 @@ class BatchConverter:
             dtype=torch.int64,
         )
         tokens.fill_(self.alphabet.padding_idx)
-        labels = []
-        strs = []
 
-        for i, (label, seq_str, seq_encoded) in enumerate(
-            zip(batch_labels, seq_str_list, seq_encoded_list)
-        ):
-            labels.append(label)
-            strs.append(seq_str)
+        for i, seq_encoded in enumerate(seq_encoded_list):
             if self.alphabet.prepend_bos:
                 tokens[i, 0] = self.alphabet.cls_idx
             seq = torch.tensor(seq_encoded, dtype=torch.int64)
@@ -278,4 +285,4 @@ class BatchConverter:
                     self.alphabet.eos_idx
                 )
 
-        return labels, strs, tokens
+        return tokens

@@ -11,7 +11,7 @@ import pytorch_lightning as pl
 
 from ..alphabet import Alphabet
 from ..dataset import MultiSequenceDataset
-from ..pipeline import (
+from ..pipeline2 import (
     standard_pipeline,
     PipelineCfg,
 )

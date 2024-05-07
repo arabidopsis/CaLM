@@ -43,13 +43,13 @@ class TransformerLayer(nn.Module):
 
     def __init__(
         self,
-        embed_dim:int,
-        ffn_embed_dim:int,
-        attention_heads:int,
-        attention_dropout:float=0.0,
-        add_bias_kv:bool=True,
-        use_esm1b_layer_norm:bool=False,
-        rope_embedding:bool=False,
+        embed_dim: int,
+        ffn_embed_dim: int,
+        attention_heads: int,
+        attention_dropout: float = 0.0,
+        add_bias_kv: bool = True,
+        use_esm1b_layer_norm: bool = False,
+        rope_embedding: bool = False,
     ):
         super().__init__()
         self.embed_dim = embed_dim

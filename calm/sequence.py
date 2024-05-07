@@ -25,16 +25,8 @@ class Sequence(abc.ABC):
             *self._sanitize(self.split(remove_white(seq_.upper()))),
             "<eos>",
         ]
-        # self._tokens = _tokens
-        self._seq = " ".join(_tokens)
-
-    @property
-    def seq(self) -> str:
-        return self._seq
-
-    @property
-    def tokens(self) -> list[str]:
-        return self._seq.split()
+        self._tokens = _tokens
+        # self._seq = " ".join(_tokens)
 
     def _sanitize(self, tokens: list[str]):
         for x in tokens:
@@ -48,11 +40,21 @@ class Sequence(abc.ABC):
 
     # @property
     # def seq(self) -> str:
-    #     return " ".join(self._tokens)
+    #     return self._seq
 
     # @property
     # def tokens(self) -> list[str]:
-    #     return self._tokens
+    #     return self._seq.split()
+    @property
+    def seq(self) -> str:
+        return " ".join(self._tokens)
+
+    @property
+    def tokens(self) -> list[str]:
+        return self._tokens
+
+    def __len__(self):
+        return len(self.tokens)
 
 
 class CodonSequence(Sequence):

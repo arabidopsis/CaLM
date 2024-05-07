@@ -9,5 +9,6 @@ fi
 time python -m calm.training --name=$name --num-steps=100 --num-layers=3 \
         --embed-dim=120 --batch-size=46 \
         --warmup-steps=10 --max-positions=50 --ffn-embed-dim=48 \
+        --ntasks-per-node=4 \
         "$@" \
         training_data.fasta training_data2.fasta

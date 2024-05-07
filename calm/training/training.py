@@ -4,13 +4,14 @@ import os
 import math
 import argparse
 from pathlib import Path
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import torch
 import numpy as np
 from torch import nn
 import pytorch_lightning as pl
 from pytorch_lightning.loggers import TensorBoardLogger
 from pytorch_lightning.callbacks import LearningRateMonitor
+from torchmetrics.functional.classification import multiclass_accuracy
 
 from .data_module import CodonDataModule
 from .checkpointing import PeriodicCheckpoint
@@ -109,13 +110,20 @@ class CodonModel(pl.LightningModule):
         )
 
         output = self.model(data)
+        # batch_size x seq_length x alphabet_size
         likelihoods = output["logits"]
         loss = self.loss_fn(
-            likelihoods.view(-1, len(self.model.alphabet.all_toks)), labels.view(-1)
+            likelihoods.view(-1, self.model.alphabet_size), labels.view(-1)
         )
 
         if batch_idx % self.cfg.accumulate_gradients == 0:
-            self.log("train_loss", loss, batch_size=self.cfg.batch_size)
+            acc = self._accuracy(likelihoods, labels)
+            self.log_dict(
+                {"train_loss": loss, "train_accuracy": acc},
+                batch_size=self.cfg.batch_size,
+                sync_dist=True,
+            )
+
         return loss
 
     def validation_step(self, val_batch, batch_idx):
@@ -126,10 +134,22 @@ class CodonModel(pl.LightningModule):
         output = self.model(data)
         likelihoods = output["logits"]
         loss = self.loss_fn(
-            likelihoods.view(-1, len(self.model.alphabet.all_toks)), labels.view(-1)
+            likelihoods.view(-1, self.model.alphabet_size), labels.view(-1)
         )
-        self.log("val_loss", loss, batch_size=self.cfg.batch_size)
+        acc = self._accuracy(likelihoods, labels)
+        self.log_dict(
+            {"train_loss": loss, "train_accuracy": acc},
+            batch_size=self.cfg.batch_size,
+        )
         return loss
+
+    def _accuracy(
+        self, likelihoods: torch.Tensor, labels: torch.Tensor
+    ) -> torch.Tensor:
+        x = likelihoods.argmax(axis=2)
+        return multiclass_accuracy(
+            x, labels, num_classes=len(self.model.alphabet), ignore_index=-100
+        )
 
 
 @dataclass
@@ -140,6 +160,10 @@ class TrainingCfg(ArgparseMixin):
         metadata=dict(type=optional(str), help="load weights from checkpoint"),
     )
     no_progress_bar: bool = False
+    # see https://lightning.ai/docs/pytorch/stable/clouds/cluster_advanced.html
+    # SLURM
+    nodes: int = 1
+    ntasks_per_node: int = 1
 
 
 def init_args() -> tuple[argparse.Namespace, list[Path]]:
@@ -165,11 +189,18 @@ def init_args() -> tuple[argparse.Namespace, list[Path]]:
     return args, fasta_files
 
 
+def slurm_env(cfg: TrainingCfg) -> TrainingCfg:
+
+    nodes = os.environ.get("SLURM_NNODES", cfg.nodes)
+    ntasks_per_node = os.environ.get("SLURM_TASKS_PER_NODE", cfg.ntasks_per_node)
+    return replace(cfg, nodes=int(nodes), ntasks_per_node=int(ntasks_per_node))
+
+
 def train() -> None:
 
     args, fasta_files = init_args()
 
-    training_cfg = TrainingCfg.create(args)
+    training_cfg = slurm_env(TrainingCfg.create(args))
     dm_cfg = CodonDataModule.create_cfg(args)
 
     # model
@@ -210,7 +241,8 @@ def train() -> None:
     logger = TensorBoardLogger(save_dir="logs", name=name)
     fast_dev_run = True if os.environ.get("DEV_RUN", "0") == "1" else False
     trainer = pl.Trainer(
-        num_nodes=1,
+        num_nodes=training_cfg.nodes,
+        devices=training_cfg.ntasks_per_node,
         precision="bf16-mixed",
         max_steps=codon_cfg.num_steps,
         logger=logger,

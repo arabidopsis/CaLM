@@ -96,8 +96,8 @@ class ProteinBertModel(nn.Module):
             [
                 TransformerLayer(
                     self.cfg.embed_dim,
-                    self.cfg.ffn_embed_dim, # 4*768
-                    self.cfg.attention_heads, # 12
+                    self.cfg.ffn_embed_dim,  # 4*768
+                    self.cfg.attention_heads,  # 12
                     attention_dropout=self.cfg.attention_dropout,
                     add_bias_kv=(self.model_version != "ESM-1b"),
                     use_esm1b_layer_norm=(self.model_version == "ESM-1b"),
@@ -205,7 +205,7 @@ class ProteinBertModel(nn.Module):
                 attentions = attentions * attention_mask[:, None, None, :, :]
             result["attentions"] = attentions
 
-        return result # batch x max_positions x alphabet_size
+        return result  # batch x max_positions x alphabet_size
 
     @property
     def num_layers(self) -> int:
