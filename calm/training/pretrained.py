@@ -1,6 +1,6 @@
 import torch
 
-from ..sequence import CodonSequence, Sequence
+from ..sequence import CodonSequence, BioSequence
 from ..model import ProteinBertModel
 from .training import CodonModel
 
@@ -20,14 +20,13 @@ class TrainedModel:
     def get_inner_model(self, model: torch.nn.Module) -> ProteinBertModel:
         return model.model
 
-    def tokenize(self, seq: Sequence) -> torch.Tensor:
-        return self.batch_converter.from_seq(seq.seq)
+    def tokenize(self, seq: BioSequence) -> torch.Tensor:
+        return self.batch_converter.from_tokens(seq.tokens)
 
     def to_tensor(self, seq: str) -> torch.Tensor:
         model = self.model
         repr_layer = model.cfg.num_layers
-        s = CodonSequence(seq)
-        r = model(self.tokenize(s), repr_layers=[repr_layer])["representations"][
+        r = model(self.tokenize(CodonSequence(seq)), repr_layers=[repr_layer])["representations"][
             repr_layer
         ]
         return r

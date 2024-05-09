@@ -148,7 +148,7 @@ class CodonModel(pl.LightningModule):
     def _accuracy(
         self, likelihoods: torch.Tensor, labels: torch.Tensor
     ) -> torch.Tensor:
-        x = likelihoods.argmax(axis=2)
+        x = likelihoods.argmax(axis=2)  # type: ignore
         return multiclass_accuracy(
             x, labels, num_classes=len(self.model.alphabet), ignore_index=-100
         )
