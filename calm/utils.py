@@ -6,7 +6,7 @@ from typing_extensions import Self
 T = TypeVar("T")
 
 
-def snake(s: str) -> str:
+def kebab(s: str) -> str:
     return s.replace("_", "-")
 
 
@@ -29,7 +29,7 @@ def add_args(argparser: argparse.ArgumentParser, cls: type) -> argparse.Argument
             if "action" not in m:
                 m["action"] = "store_true"
             argparser.add_argument(
-                f"--{snake(f.name)}",
+                f"--{kebab(f.name)}",
                 default=f.default,
                 **m,
             )
@@ -48,7 +48,7 @@ def add_args(argparser: argparse.ArgumentParser, cls: type) -> argparse.Argument
                     m["help"] = f"={f.default} {h}"
                 else:
                     m["help"] = f"={f.default}"
-            argparser.add_argument(f"--{snake(f.name)}", default=f.default, **m)
+            argparser.add_argument(f"--{kebab(f.name)}", default=f.default, **m)
     return argparser
 
 
