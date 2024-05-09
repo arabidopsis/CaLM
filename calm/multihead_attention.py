@@ -68,6 +68,7 @@ class MultiheadAttention(nn.Module):
     """Multi-headed attention.
 
     See "Attention Is All You Need" for more details.
+    https://nlp.seas.harvard.edu/annotated-transformer/
     """
 
     def __init__(

@@ -21,6 +21,7 @@ class PipelineCfg:
     leave_percent: float = 0.1
     mask_percent: float = 0.8
     max_positions: int = 1024
+    with_ground_truths: bool = False
 
 
 # def _split_array(array: np.ndarray, chunks: list[int]) -> list[np.ndarray]:
@@ -43,10 +44,9 @@ class SeqInfo:
 
 
 class PipelineOutput(TypedDict):
-    input: torch.Tensor
-    labels: torch.Tensor
-    ground_truth: list[list[str]]
-    seq_list: NotRequired[list[SeqInfo]]
+    input: torch.Tensor # batch_size x max_positions
+    labels: torch.Tensor # batch_size x max_positions
+    ground_truths: NotRequired[list[list[str]]]
 
 
 class PipelineBlock(abc.ABC):
@@ -238,21 +238,24 @@ class DataPadder(PipelineBlock):
 class DataPreprocessor(PipelineEndpoint):
     """Class to transform tokens into PyTorch Tensors."""
 
-    def __init__(self, alphabet: Alphabet):
+    def __init__(self, alphabet: Alphabet, with_ground_truths: bool = False):
         self.batch_converter = alphabet.get_batch_converter()
+        self.with_ground_truths = with_ground_truths
 
     def __call__(self, seqs_list: list[SeqInfo]) -> PipelineOutput:
 
-        ground_truth = [s.ground_truth for s in seqs_list]
+        ground_truths = [s.ground_truth for s in seqs_list]
         new_input = self.batch_converter.from_tokens([s.masked_seq for s in seqs_list])
-        labels = self.batch_converter.from_tokens(ground_truth)
+        labels = self.batch_converter.from_tokens(ground_truths)
         mask = torch.tensor(np.stack([s.target_mask for s in seqs_list], axis=0))
         labels[~mask.bool()] = -100
-        return PipelineOutput(
-            input=new_input.to(dtype=torch.int32),
-            labels=labels,
-            ground_truth=ground_truth,
-        )
+        if self.with_ground_truths:
+            return PipelineOutput(
+                input=new_input.to(dtype=torch.int32),
+                labels=labels,
+                ground_truths=ground_truths,
+            )
+        return PipelineOutput(input=new_input.to(dtype=torch.int32), labels=labels)
 
 
 def standard_pipeline(cfg: PipelineCfg, alphabet: Alphabet) -> Pipeline:
@@ -264,7 +267,7 @@ def standard_pipeline(cfg: PipelineCfg, alphabet: Alphabet) -> Pipeline:
             ),
             DataTrimmer(cfg.max_positions),
             DataPadder(cfg.max_positions),
-            DataPreprocessor(alphabet),  # for batch_coverter
+            DataPreprocessor(alphabet, cfg.with_ground_truths),  # for batch_coverter
         ]
     )
 
@@ -277,7 +280,12 @@ def test_pipeline(max_positions: int = 100) -> Pipeline:
 
 
 def show(info: SeqInfo, original: Sequence) -> None:
-    print(f"range   : {info.rng}")
+    nmask = info.masked_seq.count("<mask>")
+    padding = info.masked_seq.count("<pad>")
+    total = int(info.target_mask.sum())
+    print(
+        f"range   : {info.rng}, token length={len(original.tokens)}, mask={nmask}/{total}, padding={padding}"
+    )
     print(hsp_match(to_hit(info, original)))
 
 

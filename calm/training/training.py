@@ -105,6 +105,7 @@ class CodonModel(pl.LightningModule):
         return [optimizer], [scheduler]
 
     def training_step(self, train_batch, batch_idx):
+        # train_batch is output of Pipeline i.e. PipelineOutput object
         data, labels = train_batch["input"].to(), train_batch["labels"].to(
             dtype=torch.int64
         )
