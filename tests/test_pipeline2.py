@@ -36,8 +36,9 @@ def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
 @click.command()
 @click.argument("fasta_file", type=click.Path(dir_okay=False))
 @click.option("--verbose", is_flag=True)
+@click.option("-c", "--compact", is_flag=True, help="use compact layout for display")
 @click.argument("configuration", nargs=-1)
-def pipeline2(fasta_file: str, verbose: bool, configuration: tuple[str, ...]) -> None:
+def pipeline2(fasta_file: str, verbose: bool, configuration: tuple[str, ...],  compact:bool) -> None:
     from calm.fasta import nnfastas
     from argparse import ArgumentParser
 
@@ -91,7 +92,7 @@ def pipeline2(fasta_file: str, verbose: bool, configuration: tuple[str, ...]) ->
                 assert len(seqin.tokens) + padding == cfg.max_positions
             if verbose:
                 print(f">{rec.description}")
-                show(sinfo2, seqin)
+                show(sinfo2, seqin, join_str="" if compact else " ", width=40 if compact else 30)
     # all sequences of same length
     assert len(lengths) == 1, lengths
     assert lengths.pop() == cfg.max_positions

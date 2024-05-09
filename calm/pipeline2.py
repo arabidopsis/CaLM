@@ -44,8 +44,8 @@ class SeqInfo:
 
 
 class PipelineOutput(TypedDict):
-    input: torch.Tensor # batch_size x max_positions
-    labels: torch.Tensor # batch_size x max_positions
+    input: torch.Tensor  # batch_size x max_positions
+    labels: torch.Tensor  # batch_size x max_positions
     ground_truths: NotRequired[list[list[str]]]
 
 
@@ -279,34 +279,30 @@ def test_pipeline(max_positions: int = 100) -> Pipeline:
     )
 
 
-def show(info: SeqInfo, original: Sequence) -> None:
+def show(
+    info: SeqInfo, original: Sequence, *, join_str: str = " ", width: int = 20
+) -> None:
     nmask = info.masked_seq.count("<mask>")
     padding = info.masked_seq.count("<pad>")
     total = int(info.target_mask.sum())
     print(
         f"range   : {info.rng}, token length={len(original.tokens)}, mask={nmask}/{total}, padding={padding}"
     )
-    print(hsp_match(to_hit(info, original)))
+    print()
+    print(pipeline_match(to_hit(info, original), join_str=join_str, width=width))
 
 
 @dataclass
 class Hit:
-    length: int
-    # width: int
-    ostart: int
-    oend: int
-    mstart: int
-    mend: int
     original: list[str]
-
     matches: list[tuple[str, list[str]]]
 
 
 REMAP = {
-    "<mask>": "msk",
-    "<pad>": "pad",
-    "<eos>": "eos",
-    "<cls>": "cls",
+    "<mask>": "***",
+    "<pad>": "___",
+    "<eos>": "<<<",
+    "<cls>": ">>>",
     "<unk>": "???",
 }
 
@@ -317,15 +313,10 @@ def fix(s: str) -> str:
 
 def to_hit(info: SeqInfo, original: Sequence) -> Hit:
     seq = [fix(s) for s in original.tokens]
-    sstart, send = info.rng
+    sstart, _ = info.rng
 
     prefix = ["   "] * sstart if sstart > 0 else []
     return Hit(
-        length=len(seq),
-        ostart=0,
-        oend=len(seq),
-        mstart=sstart,
-        mend=send,
         original=seq,
         matches=[
             ("truth", prefix + [fix(s) for s in info.ground_truth]),
@@ -335,7 +326,7 @@ def to_hit(info: SeqInfo, original: Sequence) -> Hit:
     )
 
 
-def hsp_match(hsp: Hit, width: int = 20) -> str:
+def pipeline_match(hsp: Hit, width: int = 20, join_str: str = " ") -> str:
     lines = []
     ow = len("original")
     if hsp.matches:
@@ -344,26 +335,27 @@ def hsp_match(hsp: Hit, width: int = 20) -> str:
         nw = 0
     name_width = max(ow, nw)
     po = " " * (name_width - ow)
-    query_end = hsp.ostart
-    # match_end = hsp.mstart
-    for q in range(0, hsp.length, width):
+    query_end = 0
+    mpadding = [
+        (" " * (name_width - len(n)), ["   "] * (width - len(m)))
+        for n, m in hsp.matches
+    ]
+    for q in range(0, len(hsp.original), width):
         query_toks = hsp.original[q : q + width]
         s = ["   "] * (width - len(query_toks))
-        query = "  ".join(query_toks + s)
-        matches = [(n, m[q : q + width]) for n, m in hsp.matches]
+        query = join_str.join(query_toks + s)
+        matches = [(n, m[q : q + width], p) for (n, m), p in zip(hsp.matches, mpadding)]
 
-        # mlen = len(matches[0][1]) if matches else 0
         query_start = query_end
-        # match_start = match_end
         query_end += len(query_toks)
-        # match_end += mlen
+
         lines.append(
             f"original{po}:{str(query_start).rjust(8)} {query} {query_end - 1}",
         )
-        for name, match_toks in matches:
-            npad = " " * (name_width - len(name))
-            padding = ["   "] * (width - len(match_toks))
-            match = "  ".join(match_toks + padding)
+        for name, match_toks, pad in matches:
+
+            npad, padding = pad
+            match = join_str.join(match_toks + padding)
             lines.append(f"{name}{npad}:{str('|').rjust(8)} {match} |")
 
         lines.append("")
