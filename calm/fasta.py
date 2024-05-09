@@ -61,7 +61,7 @@ class RandomFasta(Sequence[Record]):
         end, start = zip(*f)
         end = end[1:] + (len(self.fasta),)
         a: list[list[int]] = [[s, e] for s, e in zip(start, end)]
-        return np.array(a,dtype=np.int64)
+        return np.array(a, dtype=np.int64)
 
     def get_idx(self, idx: int) -> Record:
         s, e = self.pos[idx]
@@ -141,7 +141,7 @@ class CollectionFasta(Sequence[Record]):
     def __getitem__(self, idx: slice) -> list[Record]: ...
     @overload
     def __getitem__(self, idx: list[int]) -> list[Record]: ...
-    def __getitem__(self, idx: int | slice | list[int]) -> Record | list[Record]:  # type: ignore
+    def __getitem__(self, idx: int | slice | list[int]) -> Record | list[Record]:
         if isinstance(idx, int):
             return self.get_idx(idx)
         if isinstance(idx, list):

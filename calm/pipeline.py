@@ -11,7 +11,7 @@ import numpy as np
 
 
 from .alphabet import Alphabet
-from .sequence import Sequence
+from .sequence import BioSequence
 
 
 @dataclass
@@ -34,7 +34,7 @@ def _split_array(array: np.ndarray, chunks: list[int]) -> list[np.ndarray]:
 
 
 class PipelineInput(NamedTuple):
-    sequences: list[Sequence]
+    sequences: list[BioSequence]
 
 
 class _PipelineData(NamedTuple):
@@ -121,7 +121,7 @@ class Pipeline:
                 )
         self.pipeline = pipeline
 
-    def __call__(self, data_: list[Sequence]) -> PipelineOutput:
+    def __call__(self, data_: list[BioSequence]) -> PipelineOutput:
         """Apply the pipeline to the data.
 
         Args:

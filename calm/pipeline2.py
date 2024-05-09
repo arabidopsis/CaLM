@@ -12,7 +12,7 @@ import numpy as np
 
 
 from .alphabet import Alphabet
-from .sequence import Sequence
+from .sequence import BioSequence
 
 
 @dataclass
@@ -21,18 +21,7 @@ class PipelineCfg:
     leave_percent: float = 0.1
     mask_percent: float = 0.8
     max_positions: int = 1024
-    with_ground_truths: bool = False
-
-
-# def _split_array(array: np.ndarray, chunks: list[int]) -> list[np.ndarray]:
-#     """Split an array into N chunks of defined size."""
-#     assert np.sum(chunks) == len(array)
-#     acc = 0
-#     arrays = []
-#     for chunk in chunks:
-#         arrays.append(array[acc : acc + chunk])
-#         acc += chunk
-#     return arrays
+    with_ground_truths: bool = False  # for debugging
 
 
 @dataclass
@@ -62,7 +51,7 @@ class PipelineEntrypoint(abc.ABC):
     """Starting point for a pipeline."""
 
     @abc.abstractmethod
-    def __call__(self, input_: list[Sequence]) -> list[SeqInfo]:
+    def __call__(self, input_: list[BioSequence]) -> list[SeqInfo]:
         """Apply the block to a sequence."""
         raise NotImplementedError
 
@@ -104,7 +93,7 @@ class Pipeline:
                 )
         self.pipeline = pipeline
 
-    def __call__(self, data_: list[Sequence]) -> PipelineOutput:
+    def __call__(self, data_: list[BioSequence]) -> PipelineOutput:
         """Apply the pipeline to the data.
 
         Args:
@@ -114,7 +103,7 @@ class Pipeline:
             Data after the pipeline has been applied.
         """
 
-        data: list[Sequence] | list[SeqInfo] | PipelineOutput = data_
+        data: list[BioSequence] | list[SeqInfo] | PipelineOutput = data_
         for transform in self.pipeline:
             data = transform(data)  # type: ignore
         return data  # type: ignore
@@ -133,7 +122,7 @@ class MaskAndChange(PipelineEntrypoint):
         self.cfg = cfg
         self.coding_toks = coding_toks
 
-    def __call__(self, input_: list[Sequence]) -> list[SeqInfo]:
+    def __call__(self, input_: list[BioSequence]) -> list[SeqInfo]:
         output = []
 
         for seq in input_:
@@ -245,17 +234,19 @@ class DataPreprocessor(PipelineEndpoint):
     def __call__(self, seqs_list: list[SeqInfo]) -> PipelineOutput:
 
         ground_truths = [s.ground_truth for s in seqs_list]
-        new_input = self.batch_converter.from_tokens([s.masked_seq for s in seqs_list])
+        new_input = self.batch_converter.from_tokens(
+            [s.masked_seq for s in seqs_list]
+        ).to(dtype=torch.int32)
         labels = self.batch_converter.from_tokens(ground_truths)
         mask = torch.tensor(np.stack([s.target_mask for s in seqs_list], axis=0))
         labels[~mask.bool()] = -100
         if self.with_ground_truths:
             return PipelineOutput(
-                input=new_input.to(dtype=torch.int32),
+                input=new_input,
                 labels=labels,
                 ground_truths=ground_truths,
             )
-        return PipelineOutput(input=new_input.to(dtype=torch.int32), labels=labels)
+        return PipelineOutput(input=new_input, labels=labels)
 
 
 def standard_pipeline(cfg: PipelineCfg, alphabet: Alphabet) -> Pipeline:
@@ -280,7 +271,7 @@ def test_pipeline(max_positions: int = 100) -> Pipeline:
 
 
 def show(
-    info: SeqInfo, original: Sequence, *, join_str: str = " ", width: int = 20
+    info: SeqInfo, original: BioSequence, *, join_str: str = " ", width: int = 20
 ) -> None:
     nmask = info.masked_seq.count("<mask>")
     padding = info.masked_seq.count("<pad>")
@@ -311,17 +302,20 @@ def fix(s: str) -> str:
     return REMAP.get(s, s)
 
 
-def to_hit(info: SeqInfo, original: Sequence) -> Hit:
-    seq = [fix(s) for s in original.tokens]
-    sstart, _ = info.rng
+BLANK = "   "
 
-    prefix = ["   "] * sstart if sstart > 0 else []
+
+def to_hit(info: SeqInfo, original: BioSequence) -> Hit:
+    seq = [fix(s) for s in original.tokens]
+    start, _ = info.rng
+
+    prefix = [BLANK] * start if start > 0 else []
     return Hit(
         original=seq,
         matches=[
             ("truth", prefix + [fix(s) for s in info.ground_truth]),
             ("data", prefix + [fix(s) for s in info.masked_seq]),
-            ("mask", prefix + [" 1 " if s > 0 else "   " for s in info.target_mask]),
+            ("mask", prefix + [" 1 " if s > 0 else BLANK for s in info.target_mask]),
         ],
     )
 
@@ -336,14 +330,12 @@ def pipeline_match(hsp: Hit, width: int = 20, join_str: str = " ") -> str:
     name_width = max(ow, nw)
     po = " " * (name_width - ow)
     query_end = 0
-    mpadding = [
-        (" " * (name_width - len(n)), ["   "] * (width - len(m)))
-        for n, m in hsp.matches
-    ]
+    mpadding = [" " * (name_width - len(n)) for n, _ in hsp.matches]
     for q in range(0, len(hsp.original), width):
         query_toks = hsp.original[q : q + width]
-        s = ["   "] * (width - len(query_toks))
-        query = join_str.join(query_toks + s)
+        padding = [BLANK] * (width - len(query_toks))
+        query = join_str.join(query_toks + padding)
+
         matches = [(n, m[q : q + width], p) for (n, m), p in zip(hsp.matches, mpadding)]
 
         query_start = query_end
@@ -352,9 +344,9 @@ def pipeline_match(hsp: Hit, width: int = 20, join_str: str = " ") -> str:
         lines.append(
             f"original{po}:{str(query_start).rjust(8)} {query} {query_end - 1}",
         )
-        for name, match_toks, pad in matches:
+        for name, match_toks, npad in matches:
 
-            npad, padding = pad
+            padding = [BLANK] * (width - len(match_toks))
             match = join_str.join(match_toks + padding)
             lines.append(f"{name}{npad}:{str('|').rjust(8)} {match} |")
 

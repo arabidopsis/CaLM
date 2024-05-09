@@ -16,7 +16,7 @@ def _split_into_codons(seq: str):
         yield seq[i : i + 3]
 
 
-class Sequence(abc.ABC):
+class BioSequence(abc.ABC):
     """Abstract base class for sequence data."""
 
     def __init__(self, seq_: str):
@@ -57,7 +57,7 @@ class Sequence(abc.ABC):
         return len(self.tokens)
 
 
-class CodonSequence(Sequence):
+class CodonSequence(BioSequence):
     """Class containing a sequence of codons.
 
     >>> seq = CodonSequence('ATGGCGCTAAAGCGGATC')
@@ -73,7 +73,7 @@ class CodonSequence(Sequence):
         return _split_into_codons(seq.replace("T", "U"))
 
 
-class AminoAcidSequence(Sequence):
+class AminoAcidSequence(BioSequence):
 
     def split(self, seq: str) -> list[str]:
         """split on letters"""

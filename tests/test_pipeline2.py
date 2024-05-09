@@ -16,7 +16,7 @@ from calm.utils import add_args, create_from_ns
 
 
 from calm.alphabet import Alphabet
-from calm.sequence import CodonSequence, Sequence
+from calm.sequence import CodonSequence, BioSequence
 
 T = TypeVar("T")
 
@@ -38,7 +38,9 @@ def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
 @click.option("--verbose", is_flag=True)
 @click.option("-c", "--compact", is_flag=True, help="use compact layout for display")
 @click.argument("configuration", nargs=-1)
-def pipeline2(fasta_file: str, verbose: bool, configuration: tuple[str, ...],  compact:bool) -> None:
+def pipeline2(
+    fasta_file: str, verbose: bool, configuration: tuple[str, ...], compact: bool
+) -> None:
     from calm.fasta import nnfastas
     from argparse import ArgumentParser
 
@@ -57,7 +59,7 @@ def pipeline2(fasta_file: str, verbose: bool, configuration: tuple[str, ...],  c
         click.echo(str(cfg))
     lengths = set()
     for batch in batched(fasta, 20):
-        iseqs: list[Sequence] = [CodonSequence(s.seq) for s in batch]
+        iseqs: list[BioSequence] = [CodonSequence(s.seq) for s in batch]
         oseqs = pipeline(iseqs)
         seq_list = mac(iseqs)
         olist: list[SeqInfo] = p2(iseqs)  # type: ignore
@@ -92,7 +94,12 @@ def pipeline2(fasta_file: str, verbose: bool, configuration: tuple[str, ...],  c
                 assert len(seqin.tokens) + padding == cfg.max_positions
             if verbose:
                 print(f">{rec.description}")
-                show(sinfo2, seqin, join_str="" if compact else " ", width=40 if compact else 30)
+                show(
+                    sinfo2,
+                    seqin,
+                    join_str="" if compact else " ",
+                    width=40 if compact else 30,
+                )
     # all sequences of same length
     assert len(lengths) == 1, lengths
     assert lengths.pop() == cfg.max_positions
