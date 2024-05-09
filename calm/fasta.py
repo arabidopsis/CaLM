@@ -61,7 +61,7 @@ class RandomFasta(Sequence[Record]):
         end, start = zip(*f)
         end = end[1:] + (len(self.fasta),)
         a: list[list[int]] = [[s, e] for s, e in zip(start, end)]
-        return np.ndarray(a) # type: ignore
+        return np.array(a,dtype=np.int64)
 
     def get_idx(self, idx: int) -> Record:
         s, e = self.pos[idx]

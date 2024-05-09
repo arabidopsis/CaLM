@@ -1,9 +1,9 @@
 """Utilities to preprocess data for training."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 import abc
 from copy import deepcopy
-from typing import NamedTuple, TypedDict, cast
+from typing import TypedDict, cast
 from typing_extensions import NotRequired
 
 import torch
@@ -34,14 +34,12 @@ class PipelineCfg:
 #     return arrays
 
 
-class PipelineInput(NamedTuple):
-    sequences: list[Sequence]
-
-
-class SeqInfo(NamedTuple):
+@dataclass
+class SeqInfo:
     ground_truth: list[str]
     masked_seq: list[str]
     target_mask: np.ndarray
+    rng: tuple[int, int] = (-1, -1)
 
 
 class PipelineOutput(TypedDict):
@@ -167,9 +165,7 @@ class MaskAndChange(PipelineEntrypoint):
         #     idxs, [num_to_mask, num_to_leave, num_to_change]
         # )
 
-        idxs_mask, _, idxs_change = random_split(
-            cast(Dataset[int], idxs), sizes
-        )
+        idxs_mask, _, idxs_change = random_split(cast(Dataset[int], idxs), sizes)
 
         for idx_mask in iter(idxs_mask):
             tokens[idx_mask] = "<mask>"
@@ -201,7 +197,7 @@ class DataTrimmer(PipelineBlock):
 
         n_tokens = len(sinfo.ground_truth)
         if n_tokens <= self.max_positions:
-            return sinfo
+            return replace(sinfo, rng=(0, n_tokens))
         else:
 
             start = np.random.randint(0, n_tokens - self.max_positions)
@@ -209,7 +205,7 @@ class DataTrimmer(PipelineBlock):
             new_original_seq = sinfo.ground_truth[start:end]
             new_masked_seq = sinfo.masked_seq[start:end]
             new_mask = sinfo.target_mask[start:end]
-            return SeqInfo(new_original_seq, new_masked_seq, new_mask)
+            return SeqInfo(new_original_seq, new_masked_seq, new_mask, rng=(start, end))
 
 
 class DataPadder(PipelineBlock):
@@ -232,8 +228,9 @@ class DataPadder(PipelineBlock):
             padding = ["<pad>"] * npadding
             ground_truth = sinfo.ground_truth + padding
             masked_seq = sinfo.masked_seq + padding
-            mask = np.concatenate([sinfo.target_mask, np.zeros(npadding)])
-            return SeqInfo(ground_truth, masked_seq, mask)
+            # note we don't mask padding...
+            target_mask = np.concatenate([sinfo.target_mask, np.zeros(npadding)])
+            return SeqInfo(ground_truth, masked_seq, target_mask, sinfo.rng)
         else:
             return sinfo
 
@@ -277,3 +274,92 @@ def test_pipeline(max_positions: int = 100) -> Pipeline:
         PipelineCfg(max_positions=max_positions),
         Alphabet.from_architecture("CodonModel"),
     )
+
+
+def show(info: SeqInfo, original: Sequence) -> None:
+    print(f"range   : {info.rng}")
+    print(hsp_match(to_hit(info, original)))
+
+
+@dataclass
+class Hit:
+    length: int
+    # width: int
+    ostart: int
+    oend: int
+    mstart: int
+    mend: int
+    original: list[str]
+
+    matches: list[tuple[str, list[str]]]
+
+
+REMAP = {
+    "<mask>": "msk",
+    "<pad>": "pad",
+    "<eos>": "eos",
+    "<cls>": "cls",
+    "<unk>": "???",
+}
+
+
+def fix(s: str) -> str:
+    return REMAP.get(s, s)
+
+
+def to_hit(info: SeqInfo, original: Sequence) -> Hit:
+    seq = [fix(s) for s in original.tokens]
+    sstart, send = info.rng
+
+    prefix = ["   "] * sstart if sstart > 0 else []
+    return Hit(
+        length=len(seq),
+        ostart=0,
+        oend=len(seq),
+        mstart=sstart,
+        mend=send,
+        original=seq,
+        matches=[
+            ("truth", prefix + [fix(s) for s in info.ground_truth]),
+            ("data", prefix + [fix(s) for s in info.masked_seq]),
+            ("mask", prefix + [" 1 " if s > 0 else "   " for s in info.target_mask]),
+        ],
+    )
+
+
+def hsp_match(hsp: Hit, width: int = 20) -> str:
+    lines = []
+    ow = len("original")
+    if hsp.matches:
+        nw = len(max(hsp.matches, key=lambda t: len(t[0]))[0])
+    else:
+        nw = 0
+    name_width = max(ow, nw)
+    po = " " * (name_width - ow)
+    query_end = hsp.ostart
+    # match_end = hsp.mstart
+    for q in range(0, hsp.length, width):
+        query_toks = hsp.original[q : q + width]
+        s = ["   "] * (width - len(query_toks))
+        query = "  ".join(query_toks + s)
+        matches = [(n, m[q : q + width]) for n, m in hsp.matches]
+
+        # mlen = len(matches[0][1]) if matches else 0
+        query_start = query_end
+        # match_start = match_end
+        query_end += len(query_toks)
+        # match_end += mlen
+        lines.append(
+            f"original{po}:{str(query_start).rjust(8)} {query} {query_end - 1}",
+        )
+        for name, match_toks in matches:
+            npad = " " * (name_width - len(name))
+            padding = ["   "] * (width - len(match_toks))
+            match = "  ".join(match_toks + padding)
+            lines.append(f"{name}{npad}:{str('|').rjust(8)} {match} |")
+
+        lines.append("")
+    del lines[-1]
+    lines.append("-" * len(lines[0]))
+
+    return "\n".join(lines)

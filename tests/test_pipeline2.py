@@ -1,11 +1,27 @@
-import click
 from itertools import islice
-from calm.pipeline2 import PipelineCfg, standard_pipeline, Pipeline, MaskAndChange
+
+from typing import Iterator, Iterable, TypeVar
+import click
+from calm.pipeline2 import (
+    PipelineCfg,
+    standard_pipeline,
+    MaskAndChange,
+    DataTrimmer,
+    DataPadder,
+    Pipeline,
+    SeqInfo,
+    show
+)
+from calm.utils import add_args, create_from_ns
+
+
 from calm.alphabet import Alphabet
 from calm.sequence import CodonSequence, Sequence
 
+T = TypeVar("T")
 
-def batched(iterable, n):
+
+def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
     # batched('ABCDEFG', 3) → ABC DEF G
     if n < 1:
         raise ValueError("n must be at least one")
@@ -19,13 +35,20 @@ def batched(iterable, n):
 
 @click.command()
 @click.argument("fasta_file", type=click.Path(dir_okay=False))
-def pipeline2(fasta_file: str) -> None:
+@click.option('--verbose', is_flag=True)
+@click.argument("configuration", nargs=-1)
+def pipeline2(fasta_file: str, verbose:bool, configuration: list[str]) -> None:
     from calm.fasta import nnfastas
+    from argparse import ArgumentParser
 
+    parser = ArgumentParser()
+    parser = add_args(parser, PipelineCfg)
+    ns = parser.parse_args(configuration)
     alphabet = Alphabet.from_architecture("CodonModel")
-    cfg = PipelineCfg()
+    cfg = create_from_ns(ns, PipelineCfg)
     pipeline = standard_pipeline(cfg, alphabet)
     mac = MaskAndChange(cfg, alphabet.coding_toks)
+    p2 = Pipeline([mac, DataTrimmer(cfg.max_positions), DataPadder(cfg.max_positions)])
 
     fasta = nnfastas([fasta_file])
     lengths = set()
@@ -33,6 +56,7 @@ def pipeline2(fasta_file: str) -> None:
         iseqs: list[Sequence] = [CodonSequence(s.seq) for s in batch]
         oseqs = pipeline(iseqs)
         seq_list = mac(iseqs)
+        olist: list[SeqInfo] = p2(iseqs)  # type: ignore
         gt = oseqs["ground_truth"]
         ip = oseqs["input"]
 
@@ -40,7 +64,11 @@ def pipeline2(fasta_file: str) -> None:
         assert ip.size() == oseqs["labels"].size()
         assert len(iseqs) == len(gt)
         assert len(seq_list) == len(batch)
-        for seqin, seqout, sinfo in zip(iseqs, gt, seq_list):
+        assert len(olist) == len(iseqs)
+        for seqin, seqout, sinfo, sinfo2, btch in zip(iseqs, gt, seq_list, olist, batch):
+            if verbose:
+                print(btch.id)
+                show(sinfo2, seqin)
 
             lengths.add(len(seqout))
             if len(seqin.tokens) <= len(seqout):
@@ -57,8 +85,10 @@ def pipeline2(fasta_file: str) -> None:
                 mmask,
                 sinfo.ground_truth,
             )
+    # all sequences of same length
     assert len(lengths) == 1, lengths
     assert lengths.pop() == cfg.max_positions
+    click.secho("OK", fg='green', bold=True)
 
 
 if __name__ == "__main__":
