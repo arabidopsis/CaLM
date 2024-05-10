@@ -11,6 +11,7 @@ import torch
 import torch.nn.functional as F
 from torch import Tensor, nn
 from torch.nn import Parameter
+# see https://arxiv.org/pdf/2104.09864
 from rotary_embedding_torch import RotaryEmbedding  # type:ignore
 
 

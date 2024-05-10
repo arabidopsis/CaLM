@@ -1,7 +1,10 @@
 """Implementation of the Alphabet and BatchConverter classes.
 
 This code has been modified from the original implementation
-by Facebook Research, describing its ESM-1b paper."""
+by Facebook Research, describing its ESM-1b paper.
+
+# see https://github.com/facebookresearch/esm/esm/data.py
+"""
 
 import itertools
 from typing import Sequence, TypedDict
@@ -92,34 +95,33 @@ class Alphabet:
         self,
         tokens: Tokens,
     ):
-        self.standard_toks = tokens["toks"]
+        standard_toks = tokens["toks"]
         self.coding_toks = tokens["coding_toks"]
 
-        self.prepend_toks = ("<cls>", "<pad>", "<eos>", "<unk>")
-        self.append_toks = ("<mask>",)
-        # self.all_special_tokens = ("<eos>", "<unk>", "<pad>", "<cls>", "<mask>")
         self.prepend_bos = False
         self.append_eos = False
 
-        self.all_toks = (*self.prepend_toks, *self.standard_toks, *self.append_toks)
+        prepend_toks = ("<cls>", "<pad>", "<eos>", "<unk>")
+        append_toks = ("<mask>",)
+        self._all_toks = (*prepend_toks, *standard_toks, *append_toks)
 
-        self.tok_to_idx = {tok: i for i, tok in enumerate(self.all_toks)}
-        self.unique_no_split_tokens = set(self.all_toks)
+        self._tok_to_idx = {tok: i for i, tok in enumerate(self._all_toks)}
+        self._unique_no_split_tokens = set(self._all_toks)
 
-        self.unk_idx = self.tok_to_idx["<unk>"]
+        self.unk_idx = self._tok_to_idx["<unk>"]
         self.padding_idx = self.get_idx("<pad>")
         self.cls_idx = self.get_idx("<cls>")
         self.mask_idx = self.get_idx("<mask>")
         self.eos_idx = self.get_idx("<eos>")
 
     def __len__(self):
-        return len(self.all_toks)
+        return len(self._all_toks)
 
     def get_idx(self, tok: str) -> int:
-        return self.tok_to_idx.get(tok, self.unk_idx)
+        return self._tok_to_idx.get(tok, self.unk_idx)
 
     def get_tok(self, ind: int) -> str:
-        return self.all_toks[ind]
+        return self._all_toks[ind]
 
     # def to_dict(self):
     #     return self.tok_to_idx.copy()
@@ -138,89 +140,89 @@ class Alphabet:
             raise ValueError("Unknown architecture selected")
         return cls(standard_toks)
 
-    def _tokenize(self, text: str) -> list[str]:
-        return text.split()
+    # def _tokenize(self, text: str) -> list[str]:
+    #     return text.split()
 
-    def tokenize(self, text: str, **kwargs) -> list[str]:
-        """
-        Inspired by https://github.com/huggingface/transformers/blob/master/src/transformers/tokenization_utils.py
-        Converts a string in a sequence of tokens, using the tokenizer.
+    # def tokenize(self, text: str, **kwargs) -> list[str]:
+    #     """
+    #     Inspired by https://github.com/huggingface/transformers/blob/master/src/transformers/tokenization_utils.py
+    #     Converts a string in a sequence of tokens, using the tokenizer.
 
-        Args:
-            text (:obj:`str`):
-                The sequence to be encoded.
+    #     Args:
+    #         text (:obj:`str`):
+    #             The sequence to be encoded.
 
-        Returns:
-            :obj:`List[str]`: The list of tokens.
-        """
+    #     Returns:
+    #         :obj:`List[str]`: The list of tokens.
+    #     """
 
-        def split_on_token(tok: str, text: str) -> list[str]:
-            result = []
-            split_text = text.split(tok)
-            for i, sub_text in enumerate(split_text):
-                # AddedToken can control whitespace stripping around them.
-                # We use them for GPT2 and Roberta to have different behavior depending on the special token
-                # Cf. https://github.com/huggingface/transformers/pull/2778
-                # and https://github.com/huggingface/transformers/issues/3788
-                # We strip left and right by default
-                if i < len(split_text) - 1:
-                    sub_text = sub_text.rstrip()
-                if i > 0:
-                    sub_text = sub_text.lstrip()
+    #     def split_on_token(tok: str, text: str) -> list[str]:
+    #         result = []
+    #         split_text = text.split(tok)
+    #         for i, sub_text in enumerate(split_text):
+    #             # AddedToken can control whitespace stripping around them.
+    #             # We use them for GPT2 and Roberta to have different behavior depending on the special token
+    #             # Cf. https://github.com/huggingface/transformers/pull/2778
+    #             # and https://github.com/huggingface/transformers/issues/3788
+    #             # We strip left and right by default
+    #             if i < len(split_text) - 1:
+    #                 sub_text = sub_text.rstrip()
+    #             if i > 0:
+    #                 sub_text = sub_text.lstrip()
 
-                if i == 0 and not sub_text:
-                    result.append(tok)
-                elif i == len(split_text) - 1:
-                    if sub_text:
-                        result.append(sub_text)
-                    else:
-                        pass
-                else:
-                    if sub_text:
-                        result.append(sub_text)
-                    result.append(tok)
-            return result
+    #             if i == 0 and not sub_text:
+    #                 result.append(tok)
+    #             elif i == len(split_text) - 1:
+    #                 if sub_text:
+    #                     result.append(sub_text)
+    #                 else:
+    #                     pass
+    #             else:
+    #                 if sub_text:
+    #                     result.append(sub_text)
+    #                 result.append(tok)
+    #         return result
 
-        def split_on_tokens(tok_list: set[str], text: str) -> list[str]:
-            if not text.strip():
-                return []
+    #     def split_on_tokens(tok_list: set[str], text: str) -> list[str]:
+    #         if not text.strip():
+    #             return []
 
-            tokenized_text: list[str] = []
-            text_list = [text]
-            for tok in tok_list:
-                tokenized_text = []
-                for sub_text in text_list:
-                    if sub_text not in self.unique_no_split_tokens:
-                        tokenized_text.extend(split_on_token(tok, sub_text))
-                    else:
-                        tokenized_text.append(sub_text)
-                text_list = tokenized_text
+    #         tokenized_text: list[str] = []
+    #         text_list = [text]
+    #         for tok in tok_list:
+    #             tokenized_text = []
+    #             for sub_text in text_list:
+    #                 if sub_text not in self._unique_no_split_tokens:
+    #                     tokenized_text.extend(split_on_token(tok, sub_text))
+    #                 else:
+    #                     tokenized_text.append(sub_text)
+    #             text_list = tokenized_text
 
-            return list(
-                itertools.chain.from_iterable(
-                    (
-                        (
-                            self._tokenize(token)
-                            if token not in self.unique_no_split_tokens
-                            else [token]
-                        )
-                        for token in tokenized_text
-                    )
-                )
-            )
+    #         return list(
+    #             itertools.chain.from_iterable(
+    #                 (
+    #                     (
+    #                         self._tokenize(token)
+    #                         if token not in self._unique_no_split_tokens
+    #                         else [token]
+    #                     )
+    #                     for token in tokenized_text
+    #                 )
+    #             )
+    #         )
 
-        no_split_token = self.unique_no_split_tokens
-        tokenized_text = split_on_tokens(no_split_token, text)
-        return tokenized_text
+    #     no_split_token = self._unique_no_split_tokens
+    #     tokenized_text = split_on_tokens(no_split_token, text)
+    #     return tokenized_text
 
-    def encode(self, text: str) -> list[int]:
-        return self.tokens2id(self.tokenize(text))
+    # def encode(self, text: str) -> list[int]:
+    #     return self.tokens2id(self.tokenize(text))
 
     def tokens2id(self, tokens: list[str]) -> list[int]:
         return [self.get_idx(tok) for tok in tokens]
 
     def tokens_ok(self, tokens: list[str]) -> bool:
-        return not bool(set(tokens) - self.unique_no_split_tokens)
+        return not bool(set(tokens) - self._unique_no_split_tokens)
 
 
 class BatchConverter:
@@ -231,33 +233,23 @@ class BatchConverter:
     def __init__(self, alphabet: Alphabet):
         self.alphabet = alphabet
 
-    def from_seq(self, seq: str) -> torch.Tensor:
-        _, _, tokens = self([("", seq)])
-        return tokens
+    # def from_seq(self, seq: str) -> torch.Tensor:
+    #     _, _, tokens = self([("", seq)])
+    #     return tokens
 
-    def from_seqs(self, seqs: Sequence[str]) -> torch.Tensor:
-        _, _, tokens = self([("", seq) for seq in seqs])
-        return tokens
+    # def from_seqs(self, seqs: Sequence[str]) -> torch.Tensor:
+    #     _, _, tokens = self([("", seq) for seq in seqs])
+    #     return tokens
 
-    def from_tokens(self, tokens: list[list[str]]) -> torch.Tensor:
+    def from_tokens(self, tokens: Sequence[list[str]]) -> torch.Tensor:
         return self._tokens_to_tensor(
             [self.alphabet.tokens2id(seq_str) for seq_str in tokens]
         )
 
-    def __call__(
-        self, raw_batch: Sequence[tuple[str, str]]
-    ) -> tuple[list[str], list[str], torch.Tensor]:
-        # RoBERTa uses an eos token, while ESM-1 does not.
-        strs: list[str]
-        labels: list[str]
-        labels, strs = map(list[str], zip(*raw_batch))
+    def __call__(self, raw_batch: Sequence[list[str]]) -> torch.Tensor:
+        return self.from_tokens(raw_batch)
 
-        seq_encoded_list = [self.alphabet.encode(seq_str) for seq_str in strs]
-        tokens = self._tokens_to_tensor(seq_encoded_list)
-
-        return labels, strs, tokens
-
-    def _tokens_to_tensor(self, seq_encoded_list: list[list[int]]) -> torch.Tensor:
+    def _tokens_to_tensor(self, seq_encoded_list: Sequence[list[int]]) -> torch.Tensor:
         batch_size = len(seq_encoded_list)
         max_len = len(max(seq_encoded_list, key=len))
         tokens = torch.empty(

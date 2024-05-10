@@ -34,12 +34,13 @@ def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
 
 
 @click.command()
-@click.argument("fasta_file", type=click.Path(dir_okay=False))
 @click.option("--verbose", is_flag=True)
+@click.option("--width", type=int)
 @click.option("-c", "--compact", is_flag=True, help="use compact layout for display")
+@click.argument("fasta_file", type=click.Path(dir_okay=False))
 @click.argument("configuration", nargs=-1)
 def pipeline2(
-    fasta_file: str, verbose: bool, configuration: tuple[str, ...], compact: bool
+    fasta_file: str, verbose: bool, configuration: tuple[str, ...], compact: bool, width: int|None
 ) -> None:
     from calm.fasta import nnfastas
     from argparse import ArgumentParser
@@ -53,7 +54,14 @@ def pipeline2(
     pipeline = standard_pipeline(cfg, alphabet)
     mac = MaskAndChange(cfg, alphabet.coding_toks)
     p2 = Pipeline([mac, DataTrimmer(cfg.max_positions), DataPadder(cfg.max_positions)])
-
+    if compact:
+        join_str = ""
+        if width is None:
+            width = 40
+    else:
+        join_str = " "
+        if width is None:
+            width = 20
     fasta = nnfastas([fasta_file])
     if verbose:
         click.echo(str(cfg))
@@ -97,8 +105,8 @@ def pipeline2(
                 show(
                     sinfo2,
                     seqin,
-                    join_str="" if compact else " ",
-                    width=40 if compact else 30,
+                    join_str=join_str,
+                    width=width,
                 )
     # all sequences of same length
     assert len(lengths) == 1, lengths

@@ -51,6 +51,7 @@ class CaLM:
                     handle.write(requests.get(url, timeout=300).content)
 
         self.model = ProteinBertModel(args)
+        self.model.eval()
         self.bc = self.model.alphabet.get_batch_converter()
 
         with open(weights_file, "rb") as handle:
@@ -75,7 +76,8 @@ class CaLM:
             raise ValueError("Input sequence must be string or CodonSequence.")
 
         tokens = self.tokenize(seq)
-        repr_ = self.model(tokens, repr_layers=[12])["representations"][12]
+        with torch.no_grad():
+            repr_ = self.model(tokens, repr_layers=[12])["representations"][12]
         if average:
             return repr_.mean(axis=1)
         else:
@@ -83,10 +85,11 @@ class CaLM:
 
     def embed_sequences(self, sequences: list[str | CodonSequence]) -> torch.Tensor:
         """Embeds a set of sequences using CaLM."""
+
         return torch.cat(
             [self.embed_sequence(seq, average=True) for seq in sequences], dim=0
         )
 
     def tokenize(self, seq: CodonSequence) -> torch.Tensor:
         assert isinstance(seq, CodonSequence), "seq must be CodonSequence"
-        return self.bc.from_seq(seq.seq)
+        return self.bc.from_tokens([seq.tokens])

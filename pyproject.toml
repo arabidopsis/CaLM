@@ -19,7 +19,7 @@ dependencies = [
     'requests',
     # 'biopython',
     # 'einops',
-    'rotary_embedding_torch',
+    'rotary_embedding_torch', # https://github.com/lucidrains/rotary-embedding-torch
     'typing_extensions',
 ]
 [project.optional-dependencies]

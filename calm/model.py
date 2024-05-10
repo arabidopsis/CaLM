@@ -205,7 +205,7 @@ class ProteinBertModel(nn.Module):
                 attentions = attentions * attention_mask[:, None, None, :, :]
             result["attentions"] = attentions
 
-        return result  # batch x max_positions x alphabet_size
+        return result  # logits = batch x max_positions x alphabet_size
 
     @property
     def num_layers(self) -> int:

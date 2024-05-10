@@ -4,7 +4,7 @@ import os
 import bisect
 from dataclasses import dataclass
 from collections.abc import Sequence
-from typing import Iterator, overload
+from typing import Iterator, overload, cast
 import numpy as np
 
 
@@ -30,10 +30,12 @@ def remove_white(s: bytes) -> bytes:
 
 
 def nnfastas(
-    fasta_files: Sequence[os.PathLike | str], encoding: str | None = None
+    fasta_files: Sequence[os.PathLike | str] | str, encoding: str | None = None
 ) -> Sequence[Record]:
     if not fasta_files:
         raise ValueError("no fasta files!")
+    if isinstance(fasta_files, str):
+        fasta_files = [fasta_files]
     if len(fasta_files) == 1:
         return RandomFasta(fasta_files[0], encoding=encoding)
     return CollectionFasta(fasta_files, encoding=encoding)
@@ -44,11 +46,19 @@ class RandomFasta(Sequence[Record]):
 
     ENCODING = "ascii"
 
-    def __init__(self, fasta_file: os.PathLike | str, encoding: str | None = None):
+    def __init__(
+        self, fasta_file: os.PathLike | str, encoding: str | bytes | None = None
+    ):
 
         self.encoding = encoding or self.ENCODING
-        self.fp = open(fasta_file, "rb")  # pylint: disable=consider-using-with
-        self.fasta = mmap.mmap(self.fp.fileno(), 0, prot=mmap.PROT_READ)
+        if isinstance(fasta_file, bytes):
+            self.fp = None
+            self.fasta = fasta_file
+        else:
+            self.fp = open(fasta_file, "rb")  # pylint: disable=consider-using-with
+            self.fasta = cast(
+                bytes, mmap.mmap(self.fp.fileno(), 0, prot=mmap.PROT_READ) # type: ignore
+            )
         self.pos = self.find_pos()
 
     def __del__(self):
@@ -71,7 +81,10 @@ class RandomFasta(Sequence[Record]):
             raise ValueError(f"not a fasta file: {str(b)}")
         e = m.start()
         desc = b[0:e]
-        sid, _ = desc.split(b" ", maxsplit=1)
+        if b" " in desc:
+            sid, _ = desc.split(b" ", maxsplit=1)
+        else:
+            sid = desc
         seq = b[e + 1 :]
         seq = remove_white(seq)
         encoding = self.encoding
