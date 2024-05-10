@@ -1,8 +1,9 @@
 import click
 from pathlib import Path
 
+
 @click.command()
-@click.option('--out')
+@click.option("--out")
 @click.argument("fasta_file", type=click.Path(dir_okay=False))
 def convert(fasta_file: str, out: str | None | Path):
     import torch
@@ -24,6 +25,7 @@ def convert(fasta_file: str, out: str | None | Path):
 
     click.secho(f"saving {out}")
     torch.save(full, out)
+
 
 if __name__ == "__main__":
     convert()  # pylint: disable=no-value-for-parameter

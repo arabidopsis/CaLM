@@ -26,9 +26,9 @@ class TrainedModel:
     def to_tensor(self, seq: str) -> torch.Tensor:
         model = self.model
         repr_layer = model.cfg.num_layers
-        r = model(self.tokenize(CodonSequence(seq)), repr_layers=[repr_layer])["representations"][
-            repr_layer
-        ]
+        r = model(self.tokenize(CodonSequence(seq)), repr_layers=[repr_layer])[
+            "representations"
+        ][repr_layer]
         return r
 
 

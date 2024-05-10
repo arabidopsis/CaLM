@@ -40,7 +40,11 @@ def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
 @click.argument("fasta_file", type=click.Path(dir_okay=False))
 @click.argument("configuration", nargs=-1)
 def pipeline2(
-    fasta_file: str, verbose: bool, configuration: tuple[str, ...], compact: bool, width: int|None
+    fasta_file: str,
+    verbose: bool,
+    configuration: tuple[str, ...],
+    compact: bool,
+    width: int | None,
 ) -> None:
     from calm.fasta import nnfastas
     from argparse import ArgumentParser
