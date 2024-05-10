@@ -30,7 +30,7 @@ def remove_white(s: bytes) -> bytes:
 
 
 def nnfastas(
-    fasta_files: Sequence[os.PathLike | str] | str, encoding: str | None = None
+    fasta_files: Sequence[os.PathLike | str | bytes], encoding: str | None = None
 ) -> Sequence[Record]:
     if not fasta_files:
         raise ValueError("no fasta files!")
@@ -47,17 +47,21 @@ class RandomFasta(Sequence[Record]):
     ENCODING = "ascii"
 
     def __init__(
-        self, fasta_file: os.PathLike | str, encoding: str | bytes | None = None
+        self,
+        fasta_file_or_bytes: os.PathLike | str | bytes,
+        encoding: str | None = None,
     ):
 
         self.encoding = encoding or self.ENCODING
-        if isinstance(fasta_file, bytes):
+        if isinstance(fasta_file_or_bytes, bytes):
             self.fp = None
-            self.fasta = fasta_file
+            self.fasta = fasta_file_or_bytes
         else:
-            self.fp = open(fasta_file, "rb")  # pylint: disable=consider-using-with
+            self.fp = open(
+                fasta_file_or_bytes, "rb"
+            )  # pylint: disable=consider-using-with
             self.fasta = cast(
-                bytes, mmap.mmap(self.fp.fileno(), 0, prot=mmap.PROT_READ)  # type: ignore
+                bytes, mmap.mmap(self.fp.fileno(), 0, prot=mmap.PROT_READ)
             )
         self.pos = self.find_pos()
 
@@ -115,7 +119,9 @@ class CollectionFasta(Sequence[Record]):
     """Multiple memory mapped fasta files"""
 
     def __init__(
-        self, fasta_files: Sequence[os.PathLike | str], encoding: str | None = None
+        self,
+        fasta_files: Sequence[os.PathLike | str | bytes],
+        encoding: str | None = None,
     ):
         self.fastas = [RandomFasta(f, encoding=encoding) for f in fasta_files]
         _cumsum = []
