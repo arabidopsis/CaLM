@@ -12,25 +12,13 @@ from calm.pipeline2 import (
     SeqInfo,
     show,
 )
-from calm.utils import add_args, create_from_ns
+from calm.utils import add_args, create_from_ns, batched
 
 
 from calm.alphabet import Alphabet
 from calm.sequence import CodonSequence, BioSequence
 
 T = TypeVar("T")
-
-
-def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
-    # batched('ABCDEFG', 3) → ABC DEF G
-    if n < 1:
-        raise ValueError("n must be at least one")
-    it = iter(iterable)
-    while True:
-        batch = tuple(islice(it, n))
-        if not batch:
-            break
-        yield batch
 
 
 @click.command()

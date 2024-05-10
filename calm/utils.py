@@ -1,5 +1,6 @@
 import argparse
-from typing import TypeVar
+from typing import TypeVar, Iterable, Iterator
+from itertools import islice
 from dataclasses import dataclass, fields, asdict, is_dataclass
 from typing_extensions import Self
 
@@ -75,3 +76,15 @@ class ArgparseMixin:
         d = asdict(self)
         d.update(kwargs)
         return argparse.Namespace(**d)
+
+
+def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
+    # batched('ABCDEFG', 3) → ABC DEF G
+    if n < 1:
+        raise ValueError("n must be at least one")
+    it = iter(iterable)
+    while True:
+        batch = tuple(islice(it, n))
+        if not batch:
+            break
+        yield batch

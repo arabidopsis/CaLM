@@ -246,8 +246,8 @@ class BatchConverter:
             [self.alphabet.tokens2id(seq_str) for seq_str in tokens]
         )
 
-    def __call__(self, raw_batch: Sequence[list[str]]) -> torch.Tensor:
-        return self.from_tokens(raw_batch)
+    def __call__(self, tokens: Sequence[list[str]]) -> torch.Tensor:
+        return self.from_tokens(tokens)
 
     def _tokens_to_tensor(self, seq_encoded_list: Sequence[list[int]]) -> torch.Tensor:
         batch_size = len(seq_encoded_list)

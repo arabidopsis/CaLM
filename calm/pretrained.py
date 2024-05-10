@@ -3,6 +3,7 @@
 import os
 import pickle
 import requests
+from typing import Sequence
 from argparse import Namespace
 import torch
 from .sequence import CodonSequence
@@ -68,14 +69,22 @@ class CaLM:
         flag is True, then the representation is averaged over all
         possible odons, providing a vector representation of the
         sequence."""
-        if isinstance(sequence, str):
-            seq = CodonSequence(sequence)
-        elif isinstance(sequence, CodonSequence):
-            seq = sequence
-        else:
-            raise ValueError("Input sequence must be string or CodonSequence.")
+        return self.embed_sequences([sequence], average=average).squeeze(0)
 
-        tokens = self.tokenize(seq)
+    def embed_sequences(
+        self, sequences: Sequence[str | CodonSequence], average: bool = True
+    ) -> torch.Tensor:
+        """Embeds a set of sequences using CaLM."""
+
+        def toseq(sequence: str | CodonSequence) -> CodonSequence:
+            if isinstance(sequence, str):
+                return CodonSequence(sequence)
+            elif isinstance(sequence, CodonSequence):
+                return sequence
+            else:
+                raise ValueError("Input sequence must be string or CodonSequence.")
+
+        tokens = self.tokenize_batch([toseq(s) for s in sequences])
         with torch.no_grad():
             repr_ = self.model(tokens, repr_layers=[12])["representations"][12]
         if average:
@@ -83,13 +92,9 @@ class CaLM:
         else:
             return repr_
 
-    def embed_sequences(self, sequences: list[str | CodonSequence]) -> torch.Tensor:
-        """Embeds a set of sequences using CaLM."""
-
-        return torch.cat(
-            [self.embed_sequence(seq, average=True) for seq in sequences], dim=0
-        )
-
     def tokenize(self, seq: CodonSequence) -> torch.Tensor:
         assert isinstance(seq, CodonSequence), "seq must be CodonSequence"
-        return self.bc.from_tokens([seq.tokens])
+        return self.tokenize_batch([seq])
+
+    def tokenize_batch(self, seqs: Sequence[CodonSequence]) -> torch.Tensor:
+        return self.bc.from_tokens([seq.tokens for seq in seqs])
