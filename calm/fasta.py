@@ -40,7 +40,7 @@ def nnfastas(
     if isinstance(fasta_files, (str, bytes, os.PathLike, io.IOBase)) or hasattr(
         fasta_files, "close"
     ):
-        fasta_files = [fasta_files] # type: ignore
+        fasta_files = [fasta_files]  # type: ignore
     if len(fasta_files) == 1:
         return RandomFasta(fasta_files[0], encoding=encoding)
     return CollectionFasta(fasta_files, encoding=encoding)

@@ -52,7 +52,6 @@ def fasta(fasta_file: IO[str], out: IO[str], number: int, start: int) -> None:
     """slice a few sequences out of a fasta file for testing data"""
     from Bio import SeqIO
     from itertools import islice
-
     SeqIO.write(islice(SeqIO.parse(fasta_file, "fasta"), start, number), out, "fasta")
 
 
