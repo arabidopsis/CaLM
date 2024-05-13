@@ -69,7 +69,7 @@ class CaLM:
         flag is True, then the representation is averaged over all
         possible odons, providing a vector representation of the
         sequence."""
-        return self.embed_sequences([sequence], average=average).squeeze(0)
+        return self.embed_sequences([sequence], average=average)# .squeeze(0)
 
     def embed_sequences(
         self, sequences: Sequence[str | CodonSequence], average: bool = True

@@ -43,10 +43,12 @@ def convert():
     # curl -F file=@tf.fasta http://127.0.0.1:5000
     if not "file" in request.files:
         abort(404)
-    fasta = RandomFasta(request.files["file"].read())
+    fasta = RandomFasta(request.files["file"])#.read())
 
     start = int(request.values.get("start", 0))
     end = int(request.values.get("end", len(fasta)))
+    if end - start > 100:
+        abort(413) # Content Too Large
 
     def tolist(t: torch.Tensor) -> list:
         # tolist just stuffs up the rounding....

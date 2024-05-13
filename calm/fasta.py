@@ -1,11 +1,14 @@
 import mmap
 import re
+import io
 import os
 import bisect
 from dataclasses import dataclass
 from collections.abc import Sequence
-from typing import Iterator, overload, cast
+from typing import Iterator, overload, cast, TypeAlias, IO
 import numpy as np
+
+FFType: TypeAlias = os.PathLike | str | bytes | IO[bytes]
 
 
 @dataclass
@@ -30,12 +33,14 @@ def remove_white(s: bytes) -> bytes:
 
 
 def nnfastas(
-    fasta_files: Sequence[os.PathLike | str | bytes], encoding: str | None = None
+    fasta_files: Sequence[FFType] | FFType, encoding: str | None = None
 ) -> Sequence[Record]:
     if not fasta_files:
         raise ValueError("no fasta files!")
-    if isinstance(fasta_files, str):
-        fasta_files = [fasta_files]
+    if isinstance(fasta_files, (str, bytes, os.PathLike, io.IOBase)) or hasattr(
+        fasta_files, "close"
+    ):
+        fasta_files = [fasta_files] # type: ignore
     if len(fasta_files) == 1:
         return RandomFasta(fasta_files[0], encoding=encoding)
     return CollectionFasta(fasta_files, encoding=encoding)
@@ -48,7 +53,7 @@ class RandomFasta(Sequence[Record]):
 
     def __init__(
         self,
-        fasta_file_or_bytes: os.PathLike | str | bytes,
+        fasta_file_or_bytes: FFType,
         encoding: str | None = None,
     ):
 
@@ -57,12 +62,15 @@ class RandomFasta(Sequence[Record]):
             self.fp = None
             self.fasta = fasta_file_or_bytes
         else:
-            self.fp = open(
-                fasta_file_or_bytes, "rb"
-            )  # pylint: disable=consider-using-with
+            self.fp = (
+                open(fasta_file_or_bytes, "rb")
+                if not hasattr(fasta_file_or_bytes, "close")
+                else cast(IO[bytes], fasta_file_or_bytes)
+            )
             self.fasta = cast(
                 bytes, mmap.mmap(self.fp.fileno(), 0, prot=mmap.PROT_READ)
             )
+
         self.pos = self.find_pos()
 
     def __del__(self):
@@ -120,7 +128,7 @@ class CollectionFasta(Sequence[Record]):
 
     def __init__(
         self,
-        fasta_files: Sequence[os.PathLike | str | bytes],
+        fasta_files: Sequence[FFType],
         encoding: str | None = None,
     ):
         self.fastas = [RandomFasta(f, encoding=encoding) for f in fasta_files]
