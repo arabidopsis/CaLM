@@ -52,6 +52,7 @@ def fasta(fasta_file: IO[str], out: IO[str], number: int, start: int) -> None:
     """slice a few sequences out of a fasta file for testing data"""
     from Bio import SeqIO
     from itertools import islice
+
     SeqIO.write(islice(SeqIO.parse(fasta_file, "fasta"), start, number), out, "fasta")
 
 
@@ -73,20 +74,109 @@ def summary(checkpoint: str, max_depth: int) -> None:
     click.echo(ModelSummary(model, max_depth=max_depth))
 
 
-@calm.command(name="rna-ok")
+@calm.command(name="cds-ok")
 @click.argument("fasta_files", type=click.Path(dir_okay=False), nargs=-1)
-def rna_ok_cmd(fasta_files: tuple[str, ...]) -> None:
-    from ..sequence import rna_ok
+def cds_ok_cmd(fasta_files: tuple[str, ...]) -> None:
+    from ..sequence import cds_ok, CodonSequence
     from ..fasta import nnfastas
+    from ..alphabet import Alphabet
 
+    alphabet = Alphabet.from_architecture("CodonModel")
+    bc = alphabet.get_batch_converter()
     nbad = 0
+    nunknown = 0
     fastaf = nnfastas(fasta_files)
-    for rec in fastaf:
-        msg = rna_ok(rec.seq)
-        if msg:
-            nbad += 1
-            click.secho(f"{rec.id}: {msg}", fg="red")
-    click.secho(f"{nbad}/{len(fastaf)} bad", fg="red" if nbad else "green")
+    with click.progressbar(fastaf, length=len(fastaf)) as bar:
+        for idx, rec in enumerate(bar, start=1):
+            msg = cds_ok(rec.seq)
+            if msg:
+                nbad += 1
+                click.secho(f"{rec.id}: {msg}", fg="red")
+            tensor = bc.from_tokens([CodonSequence(rec.seq).tokens])
+            n = (tensor == alphabet.unk_idx).sum()
+            if n:
+                nunknown += 1
+            #     print('unknown',n)
+            # print(tensor)
+            # click.secho(f"{nbad}/{idx}")
+    click.secho(
+        f"{nbad}/{len(fastaf)} bad, unknown tokens={nunknown}",
+        fg="red" if nbad else "green",
+    )
+
+
+@calm.command()
+@click.option(
+    "--out", help="output CSV filename", default="result.csv", show_default=True
+)
+@click.option("-b", "--batch-size", help="batch size", default=10, show_default=True)
+@click.option("-x", "--without-progress-bar", 'without_pb', help="no progress bar", is_flag=True)
+@click.option(
+    "-r",
+    "--round",
+    "dec",
+    default=6,
+    help="round tensor values down",
+    show_default=True,
+)
+@click.argument("fasta_files", type=click.Path(dir_okay=False), nargs=-1)
+def fasta_to_tensors(
+    fasta_files: tuple[str, ...], out: str, batch_size: int, dec: int, without_pb: bool
+) -> None:
+    # import pandas as pd
+    import gzip
+    from typing import TextIO, Protocol, Iterable, Any
+    import csv
+    from ..utils import batched
+    from ..fasta import nnfastas, Record
+    from ..pretrained import CaLM
+    class CSVWriter(Protocol):
+        def writerow(self, row: Iterable[Any]) -> Any:
+            ...
+        def writerows(self, rows: Iterable[Iterable[Any]]) -> None:
+            ...
+    # from ..sequence import CodonSequence
+
+    cm = CaLM()
+
+    def dobatch(batch: tuple[Record, ...], tgt: CSVWriter):
+        # t = cm.tokenize_batch([CodonSequence(s.seq) for s in batch])
+        tensor = cm.embed_sequences([s.seq for s in batch], average=True)
+        npt = tensor.cpu().detach().numpy()  # float32
+        assert len(npt) == len(batch)
+        for rec, trow in zip(batch, npt):
+            vlist = trow.tolist()
+            if dec > 0:
+                vlist = [round(t, dec) for t in vlist]
+            row = [rec.id] + vlist
+            tgt.writerow(row)
+
+    def outf() -> TextIO:
+        if out.endswith(".gz"):
+            return gzip.open(out, mode="wt", encoding="utf8")
+        return open(out, "wt", encoding="utf8")
+
+    fastaf = nnfastas(fasta_files)
+    nmem = len(fastaf) * 786 * 4
+    click.secho(f"translating {len(fastaf)} sequences mem={nmem}")
+    # res = []
+    with outf() as fp:
+        tgt = csv.writer(fp)
+        # tgt.writerow(["id"] + [f"col_{n}" for n in range(768)])
+        if not without_pb:
+            with click.progressbar(fastaf, length=len(fastaf)) as it:
+                for batch in batched(it, batch_size):
+                    dobatch(batch, tgt)
+                    fp.flush()
+        else:
+            for ib,batch in enumerate(batched(fastaf, batch_size),1):
+                dobatch(batch, tgt)
+                fp.flush()
+                click.secho(f"done: {ib * batch_size}/{len(fastaf)}")
+            # res.extend([dict(id=s.id, embedding=t) for s, t in zip(batch, npt)])
+
+    # df = pd.DataFrame(res)
+    # df.to_parquet(out)
 
 
 if __name__ == "__main__":
