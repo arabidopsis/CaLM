@@ -110,7 +110,9 @@ def cds_ok_cmd(fasta_files: tuple[str, ...]) -> None:
     "--out", help="output CSV filename", default="result.csv", show_default=True
 )
 @click.option("-b", "--batch-size", help="batch size", default=10, show_default=True)
-@click.option("-x", "--without-progress-bar", 'without_pb', help="no progress bar", is_flag=True)
+@click.option(
+    "-x", "--without-progress-bar", "without_pb", help="no progress bar", is_flag=True
+)
 @click.option(
     "-r",
     "--round",
@@ -130,11 +132,11 @@ def fasta_to_tensors(
     from ..utils import batched
     from ..fasta import nnfastas, Record
     from ..pretrained import CaLM
+
     class CSVWriter(Protocol):
-        def writerow(self, row: Iterable[Any]) -> Any:
-            ...
-        def writerows(self, rows: Iterable[Iterable[Any]]) -> None:
-            ...
+        def writerow(self, row: Iterable[Any]) -> Any: ...
+        def writerows(self, rows: Iterable[Iterable[Any]]) -> None: ...
+
     # from ..sequence import CodonSequence
 
     cm = CaLM()
@@ -169,7 +171,7 @@ def fasta_to_tensors(
                     dobatch(batch, tgt)
                     fp.flush()
         else:
-            for ib,batch in enumerate(batched(fastaf, batch_size),1):
+            for ib, batch in enumerate(batched(fastaf, batch_size), 1):
                 dobatch(batch, tgt)
                 fp.flush()
                 click.secho(f"done: {ib * batch_size}/{len(fastaf)}")

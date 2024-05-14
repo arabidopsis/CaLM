@@ -148,7 +148,6 @@ class BatchConverter:
     def __init__(self, alphabet: Alphabet):
         self.alphabet = alphabet
 
-
     def from_tokens(self, tokens: Sequence[list[str]]) -> torch.Tensor:
         return self._tokens_to_tensor(
             [self.alphabet.tokens_to_id(seq_str) for seq_str in tokens]
