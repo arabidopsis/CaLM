@@ -2,7 +2,7 @@ from itertools import islice
 
 from typing import Iterator, Iterable, TypeVar
 import click
-from calm.pipeline2 import (
+from calm.pipeline import (
     PipelineCfg,
     standard_pipeline,
     MaskAndChange,
@@ -27,7 +27,7 @@ T = TypeVar("T")
 @click.option("-c", "--compact", is_flag=True, help="use compact layout for display")
 @click.argument("fasta_file", type=click.Path(dir_okay=False))
 @click.argument("configuration", nargs=-1)
-def pipeline2(
+def pipeline(
     fasta_file: str,
     verbose: bool,
     configuration: tuple[str, ...],
@@ -109,4 +109,4 @@ def pipeline2(
 
 
 if __name__ == "__main__":
-    pipeline2()  # pylint: disable=no-value-for-parameter
+    pipeline()  # pylint: disable=no-value-for-parameter
