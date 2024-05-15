@@ -1,6 +1,4 @@
-from itertools import islice
-
-from typing import Iterator, Iterable, TypeVar
+from typing import TypeVar
 import click
 from calm.pipeline import (
     PipelineCfg,
@@ -43,7 +41,7 @@ def pipeline(
 
     alphabet = Alphabet.from_architecture("CodonModel")
     cfg = create_from_ns(ns, PipelineCfg)
-    pipeline = standard_pipeline(cfg, alphabet)
+    pipeline_fn = standard_pipeline(cfg, alphabet)
     mac = MaskAndChange(cfg, alphabet.coding_toks)
     p2 = Pipeline([mac, DataTrimmer(cfg.max_positions), DataPadder(cfg.max_positions)])
     if compact:
@@ -60,7 +58,7 @@ def pipeline(
     lengths = set()
     for batch in batched(fasta, 20):
         iseqs: list[BioSequence] = [CodonSequence(s.seq) for s in batch]
-        oseqs = pipeline(iseqs)
+        oseqs = pipeline_fn(iseqs)
         seq_list = mac(iseqs)
         olist: list[SeqInfo] = p2(iseqs)  # type: ignore
         gt = oseqs["ground_truths"]
