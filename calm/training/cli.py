@@ -12,7 +12,7 @@ def calm():
 @click.argument("weights_file", type=click.Path(dir_okay=False))
 @click.argument("fasta_file", type=click.Path(dir_okay=False))
 def to_tensor(weights_file: str, fasta_file: str, is_torch: bool) -> None:
-    """Convert cDNA fasta sequences into CaLM Tensors"""
+    """Convert CDS fasta sequences into CaLM Tensors"""
     from ..fasta import RandomFasta
     from .pretrained import TrainedModel, BareModel
 
@@ -87,7 +87,7 @@ def cds_ok_cmd(fasta_files: tuple[str, ...]) -> None:
     nunknown = 0
     fastaf = nnfastas(fasta_files)
     with click.progressbar(fastaf, length=len(fastaf)) as bar:
-        for idx, rec in enumerate(bar, start=1):
+        for rec in bar:
             msg = cds_ok(rec.seq)
             if msg:
                 nbad += 1
@@ -122,14 +122,14 @@ def cds_ok_cmd(fasta_files: tuple[str, ...]) -> None:
     show_default=True,
 )
 @click.argument("fasta_files", type=click.Path(dir_okay=False), nargs=-1)
-def fasta_to_tensors(
+def embed(
     fasta_files: tuple[str, ...], out: str, batch_size: int, dec: int, without_pb: bool
 ) -> None:
+    """Find embedding for fasta CDS and save to CSV"""
     # import pandas as pd
-    import gzip
-    from typing import TextIO, Protocol, Iterable, Any
+    from typing import Protocol, Iterable, Any
     import csv
-    from ..utils import batched
+    from ..utils import batched, opengz
     from ..fasta import nnfastas, Record
     from ..pretrained import CaLM
 
@@ -153,16 +153,12 @@ def fasta_to_tensors(
             row = [rec.id] + vlist
             tgt.writerow(row)
 
-    def outf() -> TextIO:
-        if out.endswith(".gz"):
-            return gzip.open(out, mode="wt", encoding="utf8")
-        return open(out, "wt", encoding="utf8")
 
     fastaf = nnfastas(fasta_files)
     nmem = len(fastaf) * 786 * 4
     click.secho(f"translating {len(fastaf)} sequences mem={nmem}")
     # res = []
-    with outf() as fp:
+    with opengz(out, mode="wt") as fp:
         tgt = csv.writer(fp)
         # tgt.writerow(["id"] + [f"col_{n}" for n in range(768)])
         if not without_pb:

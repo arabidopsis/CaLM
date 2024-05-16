@@ -3,12 +3,13 @@
 import os
 import pickle
 import requests
-from typing import Sequence
+from typing import Sequence, TYPE_CHECKING
 from argparse import Namespace
-import torch
-from .sequence import CodonSequence
-from .model import ProteinBertModel
 
+from .sequence import CodonSequence
+
+if TYPE_CHECKING:
+    import torch
 
 ARGS = Namespace(
     max_positions=1024,
@@ -41,6 +42,7 @@ class CaLM:
     bioRxiv (2022), doi: 10.1101/2022.12.15.519894."""
 
     def __init__(self, args: Namespace = ARGS, weights_file: str | None = None) -> None:
+        from .model import ProteinBertModel
         if weights_file is None:
             model_folder = os.path.join(os.path.dirname(__file__), "calm_weights")
             weights_file = os.path.join(model_folder, "calm_weights.ckpt")
@@ -64,7 +66,7 @@ class CaLM:
 
     def embed_sequence(
         self, sequence: str | CodonSequence, average: bool = True
-    ) -> torch.Tensor:
+    ) -> "torch.Tensor":
         """Embeds an individual sequence using CaLM. If the ``average''
         flag is True, then the representation is averaged over all
         possible odons, providing a vector representation of the
@@ -73,8 +75,9 @@ class CaLM:
 
     def embed_sequences(
         self, sequences: Sequence[str | CodonSequence], average: bool = True
-    ) -> torch.Tensor:
+    ) -> "torch.Tensor":
         """Embeds a set of sequences using CaLM."""
+        import torch
 
         def toseq(sequence: str | CodonSequence) -> CodonSequence:
             if isinstance(sequence, str):
@@ -92,9 +95,9 @@ class CaLM:
         else:
             return repr_
 
-    def tokenize(self, seq: CodonSequence) -> torch.Tensor:
+    def tokenize(self, seq: CodonSequence) -> "torch.Tensor":
         assert isinstance(seq, CodonSequence), "seq must be CodonSequence"
         return self.tokenize_batch([seq])
 
-    def tokenize_batch(self, seqs: Sequence[CodonSequence]) -> torch.Tensor:
+    def tokenize_batch(self, seqs: Sequence[CodonSequence]) -> "torch.Tensor":
         return self.bc.from_tokens([seq.tokens for seq in seqs])
