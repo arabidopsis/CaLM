@@ -1,8 +1,10 @@
 import argparse
+import os
 from typing import TypeVar, Iterable, Iterator, TYPE_CHECKING, IO
 from itertools import islice
 from dataclasses import dataclass, fields, asdict, is_dataclass
 from typing_extensions import Self
+from pathlib import Path
 
 if TYPE_CHECKING:
     import numpy as np
@@ -93,15 +95,16 @@ def batched(iterable: Iterable[T], n: int) -> Iterator[tuple[T, ...]]:
         yield batch
 
 
-def opengz(path: str, mode="rt") -> IO[str]:
-    if path.endswith(".gz"):
+def opengz(path: str | os.PathLike, mode="rt") -> IO[str]:
+    path = Path(path)
+    if path.name.endswith(".gz"):
         import gzip
 
         return gzip.open(path, mode=mode, encoding="utf8")
     return open(path, mode=mode, encoding="utf8")
 
 
-def load_embed(path: str) -> Iterator[tuple[str, "np.ndarray"]]:
+def load_embed(path: str | os.PathLike) -> Iterator[tuple[str, "np.ndarray"]]:
     import numpy as np
     import csv
 
