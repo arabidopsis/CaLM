@@ -3,16 +3,27 @@
 from dataclasses import dataclass, replace
 import abc
 from copy import deepcopy
-from typing import TypedDict, cast
+from typing import TypedDict
 from typing_extensions import NotRequired
 
 import torch
-from torch.utils.data import random_split, Dataset
 import numpy as np
 
 
 from .alphabet import Alphabet
 from .sequence import BioSequence
+from .rand import get_rng
+
+
+def _split_array(array: np.ndarray, chunks: list[int]) -> list[np.ndarray]:
+    """Split an array into N chunks of defined size."""
+    assert np.sum(chunks) == len(array)
+    acc = 0
+    arrays = []
+    for chunk in chunks:
+        arrays.append(array[acc : acc + chunk])
+        acc += chunk
+    return arrays
 
 
 @dataclass
@@ -141,25 +152,23 @@ class MaskAndChange(PipelineEntrypoint):
         num_to_change = num_changed_tokens - num_to_mask - num_to_leave
 
         sizes = [num_to_mask, num_to_leave, num_to_change]
-        if 0 in sizes:
-            print("problem with sizes", num_changed_tokens, sizes, tokens_)
-
+        # if 0 in sizes:
+        #     print("problem with sizes", num_changed_tokens, sizes, tokens_)
+        rng = get_rng()
         # Apply masking
-        idxs = np.random.choice(
+        idxs = rng.choice(
             np.arange(1, num_tokens - 1, dtype=np.int32),  # avoid <cls> and <eos>
             size=num_changed_tokens,
             replace=False,
         )
-        # idxs_mask, _, idxs_change = _split_array(
-        #     idxs, [num_to_mask, num_to_leave, num_to_change]
-        # )
 
-        idxs_mask, _, idxs_change = random_split(cast(Dataset[int], idxs), sizes)
+        # idxs_mask, _, idxs_change = random_split(cast(Dataset[int], idxs), sizes)
+        idxs_mask, _, idxs_change = _split_array(idxs, sizes)
 
         for idx_mask in iter(idxs_mask):
             tokens[idx_mask] = "<mask>"
         for idx_change in iter(idxs_change):
-            tokens[idx_change] = np.random.choice(self.coding_toks)
+            tokens[idx_change] = rng.choice(self.coding_toks)
 
         # Generate masks
         mask = np.zeros(num_tokens)
@@ -188,8 +197,7 @@ class DataTrimmer(PipelineBlock):
         if n_tokens <= self.max_positions:
             return replace(sinfo, rng=(0, n_tokens))
         else:
-
-            start = np.random.randint(0, n_tokens - self.max_positions)
+            start = get_rng().integers(0, n_tokens - self.max_positions)
             end = start + self.max_positions
             new_original_seq = sinfo.ground_truth[start:end]
             new_masked_seq = sinfo.masked_seq[start:end]

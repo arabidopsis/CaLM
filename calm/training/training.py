@@ -244,7 +244,7 @@ def train() -> None:
     # logger = CSVLogger("logs", name=name)
     # pip install tensorboard
     logger = TensorBoardLogger(save_dir="logs", name=name)
-    fast_dev_run = True if os.environ.get("DEV_RUN", "0") == "1" else False
+    fast_dev_run = os.environ.get("DEV_RUN", "0") == "1"
     trainer = pl.Trainer(
         num_nodes=training_cfg.nodes,
         devices=training_cfg.ntasks_per_node,

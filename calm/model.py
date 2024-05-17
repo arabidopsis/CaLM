@@ -33,9 +33,9 @@ class ProteinBertModelCfg(ArgparseMixin):
         default=False,
         metadata=dict(help="whether to apply bias to logits"),
     )
-    rope_embedding: bool = field(
-        default=True,
-        metadata=dict(help="whether to use Rotary Positional Embeddings"),
+    no_rope_embedding: bool = field(
+        default=False,
+        metadata=dict(help="don't use Rotary Positional Embeddings"),
     )
     ffn_embed_dim: int = field(
         default=768 * 4,
@@ -101,7 +101,7 @@ class ProteinBertModel(nn.Module):
                     attention_dropout=self.cfg.attention_dropout,
                     add_bias_kv=(self.model_version != "ESM-1b"),
                     use_esm1b_layer_norm=(self.model_version == "ESM-1b"),
-                    rope_embedding=self.cfg.rope_embedding,
+                    rope_embedding=not self.cfg.no_rope_embedding,
                 )
                 for _ in range(self.cfg.num_layers)
             ]
@@ -109,7 +109,7 @@ class ProteinBertModel(nn.Module):
 
     def _init_submodules_esm1b(self):
         self._init_submodules_common()
-        if not self.cfg.rope_embedding:
+        if self.cfg.no_rope_embedding:
             self.embed_positions = LearnedPositionalEmbedding(
                 self.max_positions, self.cfg.embed_dim, self.alphabet.padding_idx
             )

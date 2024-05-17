@@ -16,6 +16,7 @@ from ..pipeline import (
     PipelineCfg,
 )
 from ..utils import ArgparseMixin
+from ..rand import set_random_seed
 
 
 @dataclass
@@ -63,6 +64,7 @@ class CodonDataModule(pl.LightningDataModule):
         generator = torch.Generator()
         if self.random_seed != -1:
             generator = generator.manual_seed(self.random_seed)
+            set_random_seed(self.random_seed)
 
         self.train_data, self.val_data = random_split(
             dataset,
